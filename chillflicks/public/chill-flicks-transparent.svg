@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main Text -->
+  <g transform="translate(50, 150)">
+    <!-- "CHILL" Text -->
+    <text x="0" y="0" font-family="Arial, sans-serif" font-weight="bold" font-size="90" fill="#4CC9F0">
+      CHILL
+    </text>
+    
+    <!-- "FLICKS" Text -->
+    <text x="280" y="0" font-family="Arial, sans-serif" font-weight="bold" font-size="90" fill="#F72585">
+      FLICKS
+    </text>
+  </g>
+  
+  <!-- Cool accent line -->
+  <path d="M50,170 L550,170" stroke="#2A81CB" stroke-width="4" stroke-opacity="0.5" stroke-linecap="round"/>
+  
+  <!-- Small film reel icon -->
+  <g transform="translate(500, 60) scale(0.6)">
+    <circle cx="50" cy="50" r="40" fill="none" stroke="#F72585" stroke-width="8"/>
+    <circle cx="50" cy="50" r="12" fill="#F72585"/>
+    <circle cx="50" cy="10" r="8" fill="#F72585"/>
+    <circle cx="50" cy="90" r="8" fill="#F72585"/>
+    <circle cx="10" cy="50" r="8" fill="#F72585"/>
+    <circle cx="90" cy="50" r="8" fill="#F72585"/>
+  </g>
+  
+  <!-- Cool element (stylized snowflake) -->
+  <g transform="translate(80, 85)">
+    <circle cx="0" cy="0" r="20" fill="#4CC9F0" opacity="0.8"/>
+    <circle cx="0" cy="0" r="12" fill="transparent"/>
+  </g>
+  
+  <!-- Bottom tagline -->
+  <text x="300" y="230" font-family="Arial, sans-serif" font-size="18" fill="#7B8794" text-anchor="middle">
+    relax • watch • enjoy
+  </text>
+</svg>

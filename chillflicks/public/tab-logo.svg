@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#0D1117" rx="8" ry="8"/>
+  
+  <!-- "CF" Monogram -->
+  <text x="18" y="42" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="#4CC9F0">C</text>
+  <text x="38" y="42" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="#F72585">F</text>
+  
+  <!-- Subtle gradient overlay -->
+  <rect width="64" height="64" fill="url(#overlay)" rx="8" ry="8" opacity="0.1"/>
+  <defs>
+    <linearGradient id="overlay" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4CC9F0" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#F72585" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+</svg>
