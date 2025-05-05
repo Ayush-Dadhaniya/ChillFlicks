@@ -9,7 +9,7 @@ const Footer = () => {
       </p>
       <div className="flex gap-4 mt-2 sm:mt-0">
         <a
-          href="https://github.com/yourusername"
+          href="https://github.com/Ayush-Dadhaniya"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-white"
@@ -17,7 +17,7 @@ const Footer = () => {
           <FaGithub size={20} />
         </a>
         <a
-          href="https://linkedin.com/in/yourusername"
+          href="https://www.linkedin.com/in/ayushdadhaniya"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-white"
@@ -25,7 +25,7 @@ const Footer = () => {
           <FaLinkedin size={20} />
         </a>
         <a
-          href="https://yourportfolio.com"
+          href="https://ayushdadhaniyaportfolio.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-white"
