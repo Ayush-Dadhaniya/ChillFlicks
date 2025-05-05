@@ -12,7 +12,7 @@ const Navbar = () => {
     <div className="bg-black font-sans text-white p-1 sticky top-0 left-0 w-full z-50">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <div className="flex-shrink-0 w-32 h-16 flex items-center">
+        <div className="flex-shrink-0 w-52 h-16 flex items-center">
           <img src="/chill-flicks-transparent.svg" alt="logo" className="w-full h-auto" />
         </div>
 
