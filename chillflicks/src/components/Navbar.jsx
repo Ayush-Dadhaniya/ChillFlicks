@@ -18,9 +18,8 @@ const Navbar = () => {
 
         {/* Navigation Tabs (center) */}
         <div className="hidden md:flex space-x-6 text-lg justify-center flex-1">
-          <Link href="/" className="hover:text-gray-300 hover:font-bold">Home</Link>
-          <Link href="/create" className="hover:text-gray-300 hover:font-bold">Create</Link>
-          <Link href="/join" className="hover:text-gray-300 hover:font-bold">Join</Link>
+          <Link to="/" className="hover:text-gray-300 hover:font-bold">Home</Link>
+          <Link to="/room" className="hover:text-gray-300 hover:font-bold">Room</Link>
         </div>
 
         {/* Auth Buttons (right) */}
@@ -64,9 +63,8 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {menuOpen && (
         <div className="flex flex-col justify-center items-center bg-black px-4 pt-4 pb-2 md:hidden">
-          <Link href="/" className="block py-2 hover:font-bold hover:text-gray-300">Home</Link>
-          <Link href="/create" className="block py-2 hover:font-bold hover:text-gray-300">Create</Link>
-          <Link href="/join" className="block py-2 hover:font-bold hover:text-gray-300">Join</Link>
+          <Link to="/" className="block py-2 hover:font-bold hover:text-gray-300">Home</Link>
+          <Link to="/room" className="block py-2 hover:font-bold hover:text-gray-300">Room</Link>
           {isLoggedIn ? (
             <>
               <button className="block py-2 hover:font-bold hover:text-gray-300">Profile</button>
