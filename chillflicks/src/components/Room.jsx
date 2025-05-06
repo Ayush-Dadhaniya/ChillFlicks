@@ -1,7 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Room = () => {
+  const navigate = useNavigate();
+
   const [roomCode, setRoomCode] = useState("");
+  const [inputCode, setInputCode] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [buttonText, setButtonText] = useState("Generate Room Code");
   const [copyText, setCopyText] = useState("Click to copy room code");
@@ -15,6 +19,9 @@ const Room = () => {
     setRoomCode(result);
     setShowCode(true);
     setButtonText("Generate New Code");
+
+    // Navigate to room with code as path param
+    navigate(`/room/${result}`);
   };
 
   const copyRoomLink = () => {
@@ -24,6 +31,15 @@ const Room = () => {
         setCopyText("Click to copy room code");
       }, 2000);
     });
+  };
+
+  const joinRoom = () => {
+    const trimmed = inputCode.trim().toUpperCase();
+    if (trimmed.length === 6) {
+      navigate(`/room/${trimmed}`);
+    } else {
+      alert("Please enter a valid 6-character room code.");
+    }
   };
 
   return (
@@ -73,10 +89,15 @@ const Room = () => {
             <input
               type="text"
               maxLength="6"
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value)}
               placeholder="Enter room code"
               className="w-full mb-4 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F72585]"
             />
-            <button className="bg-[#F72585] text-black font-bold px-6 py-3 rounded-lg hover:-translate-y-1 transition-transform duration-200">
+            <button
+              onClick={joinRoom}
+              className="bg-[#F72585] text-black font-bold px-6 py-3 rounded-lg hover:-translate-y-1 transition-transform duration-200"
+            >
               Join Room
             </button>
           </div>
