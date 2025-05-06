@@ -53,7 +53,7 @@ const Room = () => {
                 </div>
                 <div
                   onClick={copyRoomLink}
-                  className="mt-3 text-sm text-[#4CC9F0] cursor-pointer hover:underline"
+                  className="mt-3 text-sm text-[#4CC9F0] cursor-pointer"
                 >
                   {copyText}
                 </div>
