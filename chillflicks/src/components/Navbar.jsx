@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import Profile from './Profile'; // Import your Profile component
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // simulate auth state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const navigate = useNavigate();
 
-  const handleLoginToggle = () => setIsLoggedIn(!isLoggedIn);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setIsLoggedIn(!!token);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsLoggedIn(false);
+    navigate('/');
+  };
 
   return (
     <div className="bg-black font-sans text-white p-1 sticky top-0 left-0 w-full z-50">
@@ -16,21 +28,24 @@ const Navbar = () => {
           <img src="/chill-flicks-transparent.svg" alt="logo" className="w-full h-auto" />
         </div>
 
-        {/* Navigation Tabs (center) */}
+        {/* Navigation Tabs */}
         <div className="hidden md:flex space-x-6 text-lg justify-center flex-1">
           <Link to="/" className="hover:text-gray-300 hover:font-bold">Home</Link>
           <Link to="/room" className="hover:text-gray-300 hover:font-bold">Room</Link>
         </div>
 
-        {/* Auth Buttons (right) */}
+        {/* Auth Buttons */}
         <div className="hidden md:flex space-x-4">
           {isLoggedIn ? (
             <>
-              <button className="px-4 py-2 font-bold rounded-full hover:-translate-y-1 transition-transform duration-200">
+              <button
+                onClick={() => setShowProfile(true)}
+                className="px-4 py-2 font-bold rounded-full hover:-translate-y-1 transition-transform duration-200"
+              >
                 Profile
               </button>
               <button
-                onClick={handleLoginToggle}
+                onClick={handleLogout}
                 className="px-4 py-2 font-bold bg-purple-500 rounded-full hover:-translate-y-1 hover:text-black transition-transform duration-200"
               >
                 Logout
@@ -52,7 +67,7 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Hamburger Icon */}
+        {/* Hamburger */}
         <div className="md:hidden">
           <button onClick={() => setMenuOpen(!menuOpen)} className="text-white focus:outline-none">
             {menuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -67,8 +82,18 @@ const Navbar = () => {
           <Link to="/room" className="block py-2 hover:font-bold hover:text-gray-300">Room</Link>
           {isLoggedIn ? (
             <>
-              <button className="block py-2 hover:font-bold hover:text-gray-300">Profile</button>
-              <button onClick={handleLoginToggle} className="block py-2 hover:font-bold hover:text-gray-300">Logout</button>
+              <button
+                onClick={() => {
+                  setShowProfile(true);
+                  setMenuOpen(false);
+                }}
+                className="block py-2 hover:font-bold hover:text-gray-300"
+              >
+                Profile
+              </button>
+              <button onClick={handleLogout} className="block py-2 hover:font-bold hover:text-gray-300">
+                Logout
+              </button>
             </>
           ) : (
             <>
@@ -80,6 +105,21 @@ const Navbar = () => {
               </Link>
             </>
           )}
+        </div>
+      )}
+
+      {/* Profile Sidebar Drawer */}
+      {showProfile && (
+        <div className="fixed top-0 right-0 w-80 h-full bg-white text-black shadow-lg z-50 p-4 overflow-y-auto">
+          <button
+            onClick={() => setShowProfile(false)}
+            className="text-gray-700 font-bold text-lg absolute top-2 right-4"
+          >
+            ✕
+          </button>
+          <div className="mt-10">
+            <Profile />
+          </div>
         </div>
       )}
     </div>
