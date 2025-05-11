@@ -11,6 +11,7 @@ const Profile = () => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
+      return;
     }
 
     const fetchUserData = async () => {
@@ -18,9 +19,18 @@ const Profile = () => {
         const res = await fetch('http://localhost:3000/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
+
+        if (!res.ok) throw new Error('Failed to fetch user');
+
         const data = await res.json();
         setUser(data);
-        setAvatarPreview(data.avatar || null);
+
+        // If avatar exists, prepend full server path
+        if (data.avatar) {
+          setAvatarPreview(`http://localhost:3000${data.avatar}`);
+        } else {
+          setAvatarPreview(null);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -35,13 +45,15 @@ const Profile = () => {
       setAvatar(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarPreview(reader.result);
+        setAvatarPreview(reader.result); // Temporary preview before upload
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleProfileUpdate = async () => {
+    if (!avatar) return alert('Please select an image first');
+
     const formData = new FormData();
     formData.append('avatar', avatar);
 
@@ -53,10 +65,14 @@ const Profile = () => {
         },
         body: formData
       });
+
       const data = await res.json();
       if (data.success) {
         alert('Profile updated successfully');
-        setAvatarPreview(data.avatar);
+        setAvatarPreview(`http://localhost:3000${data.avatar}`);
+        setAvatar(null); // clear selected file
+      } else {
+        alert('Avatar update failed');
       }
     } catch (err) {
       console.error(err);
@@ -67,11 +83,11 @@ const Profile = () => {
   return (
     <div className="text-black bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-auto">
       <h2 className="text-2xl font-semibold text-center mb-6 text-purple-600">User Profile</h2>
-      
+
       <div className="flex flex-col items-center space-y-4">
         <div className="relative">
           <img
-            src={avatarPreview || '/default-avatar.png'}
+            src={avatarPreview || '/default_avatar.png'}
             alt="Avatar"
             className="w-32 h-32 rounded-full object-cover border-4 border-purple-500 shadow-md"
           />
@@ -82,14 +98,7 @@ const Profile = () => {
               className="hidden"
               accept="image/*"
             />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 text-white"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-3.828-3.828A2 2 0 0012.172 2H4z" />
-            </svg>
+            📸
           </label>
         </div>
 
