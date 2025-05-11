@@ -10,12 +10,25 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    setIsLoggedIn(!!token);
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      setIsLoggedIn(!!token);
+    };
+
+    // Run once on mount
+    checkAuth();
+
+    // Listen for login/logout events
+    window.addEventListener('authChanged', checkAuth);
+
+    return () => {
+      window.removeEventListener('authChanged', checkAuth);
+    };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    window.dispatchEvent(new Event('authChanged'));
     setIsLoggedIn(false);
     navigate('/');
   };

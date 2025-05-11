@@ -6,7 +6,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import jwt from 'jsonwebtoken';
-import User from './models/User.js'; // Adjust path as needed
+import User from './models/User.js';
 import fs from 'fs';
 
 dotenv.config();

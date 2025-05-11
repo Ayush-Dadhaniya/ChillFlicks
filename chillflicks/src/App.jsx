@@ -5,7 +5,9 @@ import Signup from './components/Signup';
 import Home from './components/Home';
 import Footer from './components/Footer';
 import Room from './components/Room';
-import Lobby from "./components/Lobby";
+import Lobby from './components/Lobby';
+import ProtectedRoute from './components/ProtectedRoute';
+
 function App() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -15,8 +17,22 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/room" element={<Room />} />
-          <Route path="/room/:roomCode" element={<Lobby />} />
+          <Route
+            path="/room"
+            element={
+              <ProtectedRoute>
+                <Room />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/room/:roomCode"
+            element={
+              <ProtectedRoute>
+                <Lobby />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
       <Footer />

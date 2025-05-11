@@ -21,6 +21,7 @@ const Signup = () => {
       const data = await res.json();
       if(res.ok){
         localStorage.setItem('token', data.token);
+        window.dispatchEvent(new Event('authChanged'));
         navigate('/');
       }else {
         alert(data.message || 'Registration failed');

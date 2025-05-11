@@ -29,6 +29,7 @@ const Login = () => {
 
       if (res.ok) {
         localStorage.setItem('token', data.token);
+        window.dispatchEvent(new Event('authChanged'));
         navigate('/');
       } else {
         setErrorMessage(data.message || 'Login failed');
