@@ -17,30 +17,46 @@ const Lobby = () => {
 
   const API_URL = "http://localhost:3000";
 
-  const fetchRoomDetails = async (token) => {
-    try {
-      const response = await axios.get(`${API_URL}/rooms/${roomCode}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      console.log("Fetched room:", response.data);
-      setVideoUrl(response.data.videoUrl);
-      setIsPlaying(response.data.isPlaying);
-    } catch (error) {
-      console.error("Error fetching room details:", error.response?.data || error.message);
+  // Fetch room details with improved error handling
+const fetchRoomDetails = async (token) => {
+  try {
+    console.log("Fetching room details..."); // Log the start of the fetch
+    const response = await axios.get(`${API_URL}/rooms/${roomCode}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    console.log("Room Details Fetched:", response.data); // Log room details
+    setVideoUrl(response.data.videoUrl);
+    setIsPlaying(response.data.isPlaying);
+    setParticipants(response.data.participants); // Set participants
+  } catch (error) {
+    // Log the complete error object for debugging
+    console.error("Error fetching room details:", error);
+    if (error.response) {
+      // If the error has a response, log its data
+      console.error("Error Response Data:", error.response.data);
+      console.error("Error Response Status:", error.response.status);
+    } else if (error.request) {
+      // If there is no response but a request was made
+      console.error("Error Request:", error.request);
+    } else {
+      // If there was an issue setting up the request
+      console.error("Error Message:", error.message);
     }
-  };
+  }
+};
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
       const decoded = JSON.parse(atob(token.split('.')[1]));
       const name = decoded.username || decoded.name || "Unknown";
       setUserName(name);
-      fetchRoomDetails(token);
+      console.log("Fetching room details...");
+      fetchRoomDetails(token); // Ensure we wait for the details
     } catch (err) {
       console.error("Invalid token:", err);
     }
@@ -49,27 +65,25 @@ const Lobby = () => {
   useEffect(() => {
     if (!userName) return;
 
-    socket.emit("joinRoom", roomCode, userName);
-
-    socket.on("roomDetails", (roomData) => {
-      setVideoUrl(roomData.videoUrl);
-      setIsPlaying(roomData.isPlaying);
-    });
+    console.log(`User ${userName} joining room ${roomCode}`);
+    socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
     socket.on("newMessage", (message) => {
+      console.log("New message received:", message); // Log incoming messages
       setMessages((prevMessages) => [...prevMessages, message]);
     });
 
     socket.on("videoStateChanged", (isPlaying) => {
+      console.log("Video state changed:", isPlaying); // Log video state change
       setIsPlaying(isPlaying);
     });
 
     socket.on("participantJoined", (participants) => {
+      console.log("Participants updated:", participants); // Log participants update
       setParticipants(participants);
     });
 
     return () => {
-      socket.off("roomDetails");
       socket.off("newMessage");
       socket.off("videoStateChanged");
       socket.off("participantJoined");
@@ -78,15 +92,19 @@ const Lobby = () => {
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      socket.emit("sendMessage", roomCode, userName, newMessage);
+      console.log("Sending message:", newMessage); // Log the message being sent
+      socket.emit("sendMessage", { roomId: roomCode, sender: userName, message: newMessage });
       setNewMessage("");
+    } else {
+      console.log("No message to send");
     }
   };
 
   const handlePlayPause = () => {
     const newPlayState = !isPlaying;
     setIsPlaying(newPlayState);
-    socket.emit("updateVideoState", roomCode, newPlayState);
+    console.log(`Video state changed to ${newPlayState ? "Playing" : "Paused"}`);
+    socket.emit("updateVideoState", { roomId: roomCode, isPlaying: newPlayState });
   };
 
   return (
@@ -106,7 +124,7 @@ const Lobby = () => {
                 <iframe
                   width="100%"
                   height="100%"
-                  src={`https://www.youtube.com/embed/${new URL(videoUrl).searchParams.get("v")}`}
+                  src={videoUrl}
                   title="YouTube video player"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -166,7 +184,7 @@ const Lobby = () => {
 
           {/* Participants */}
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col">
-            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">🫂 Participants</div>
+            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">Participants</div>
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
               {participants.map((part, i) => (
                 <div key={i} className="flex items-center space-x-2">

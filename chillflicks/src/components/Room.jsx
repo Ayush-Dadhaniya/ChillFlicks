@@ -10,7 +10,30 @@ const Room = () => {
   const [showCode, setShowCode] = useState(false);
   const [buttonText, setButtonText] = useState("Generate Room Code");
   const [copyText, setCopyText] = useState("Click to copy room code");
-
+  const convertToEmbedUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+  
+      let videoId = "";
+      if (urlObj.hostname.includes("youtube.com")) {
+        videoId = urlObj.searchParams.get("v");
+      } else if (urlObj.hostname === "youtu.be") {
+        videoId = urlObj.pathname.slice(1);
+      } else if (urlObj.hostname.startsWith("m.youtube.com")) {
+        videoId = urlObj.searchParams.get("v");
+      }
+  
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+  
+      return url; // Return original if not a recognized YouTube format
+    } catch (e) {
+      console.error("Invalid video URL", e);
+      return url;
+    }
+  };
+  
   const getHostFromToken = () => {
   const token = localStorage.getItem("token");  // Corrected to 'token' based on your localStorage key
   if (token) {
@@ -44,7 +67,7 @@ const Room = () => {
     const response = await fetch('http://localhost:3000/rooms/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, videoUrl }), // pass host and videoUrl
+      body: JSON.stringify({ host, videoUrl: convertToEmbedUrl(videoUrl) }),
     });
 
     const data = await response.json();

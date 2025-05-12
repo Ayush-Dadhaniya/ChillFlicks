@@ -9,6 +9,7 @@ import multer from 'multer';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import User from './models/User.js';
+import Room from './models/Room.js';
 import fs from 'fs';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -67,16 +68,17 @@ const authenticateUser = async (req, res, next) => {
 
 // Routes setup
 app.get('/', (req, res) => res.send('Hello, World!'));
-app.get('/profile', authenticateUser, (req, res) => res.json(req.user));
-app.post('/profile/update-avatar', authenticateUser, upload.single('avatar'), async (req, res) => {
+
+app.get('/rooms/:roomCode', authenticateUser, async (req, res) => {
   try {
-    const avatarPath = `/uploads/avatars/${req.file.filename}`;
-    req.user.avatar = avatarPath;
-    await req.user.save();
-    res.json({ success: true, avatar: avatarPath });
-  } catch (err) {
-    console.error('Error updating avatar:', err);
-    res.status(500).json({ message: 'Error updating avatar' });
+    const room = await Room.findOne({ roomCode: req.params.roomCode });
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+    res.json(room);
+  } catch (error) {
+    console.error("Error fetching room details:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -92,7 +94,6 @@ const videoState = {}; // Track video state for each room
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // Handle user joining a room
   socket.on('joinRoom', ({ roomId, user }) => {
     socket.join(roomId);
 
@@ -109,16 +110,13 @@ io.on('connection', (socket) => {
     console.log(`${user} joined room: ${roomId}`);
     socket.to(roomId).emit('userJoined', `${user} joined`);
 
-    // Send current video state when a new participant joins
     socket.emit('videoState', videoState[roomId]);
   });
 
-  // Handle message sending
   socket.on('sendMessage', ({ roomId, message, sender }) => {
     io.to(roomId).emit('receiveMessage', { message, sender });
   });
 
-  // Handle video play/pause state change
   socket.on('updateVideoState', ({ roomId, isPlaying, currentTime }) => {
     if (videoState[roomId]) {
       videoState[roomId] = { isPlaying, currentTime };
@@ -126,7 +124,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle video time update
   socket.on('updateVideoTime', ({ roomId, currentTime }) => {
     if (videoState[roomId]) {
       videoState[roomId].currentTime = currentTime;
@@ -134,17 +131,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle user disconnect
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
 
     for (const roomId in participants) {
       participants[roomId] = participants[roomId].filter(p => p.id !== socket.id);
-
-      // Optionally notify others
       io.to(roomId).emit('userLeft', socket.id);
 
-      // Clean up empty rooms
       if (participants[roomId].length === 0) {
         delete participants[roomId];
         delete videoState[roomId];
