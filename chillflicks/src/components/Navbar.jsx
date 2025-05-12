@@ -44,7 +44,7 @@ const Navbar = () => {
         {/* Navigation Tabs */}
         <div className="hidden md:flex space-x-6 text-lg justify-center flex-1">
           <Link to="/" className="hover:text-gray-300 hover:font-bold">Home</Link>
-          <Link to="/room" className="hover:text-gray-300 hover:font-bold">Room</Link>
+          <Link to="/rooms" className="hover:text-gray-300 hover:font-bold">Room</Link>
         </div>
 
         {/* Auth Buttons */}
@@ -92,7 +92,7 @@ const Navbar = () => {
       {menuOpen && (
         <div className="flex flex-col justify-center items-center bg-black px-4 pt-4 pb-2 md:hidden">
           <Link to="/" className="block py-2 hover:font-bold hover:text-gray-300">Home</Link>
-          <Link to="/room" className="block py-2 hover:font-bold hover:text-gray-300">Room</Link>
+          <Link to="/rooms" className="block py-2 hover:font-bold hover:text-gray-300">Room</Link>
           {isLoggedIn ? (
             <>
               <button

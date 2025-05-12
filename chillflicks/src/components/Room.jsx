@@ -52,7 +52,7 @@ const Room = () => {
       setRoomCode(data.roomCode);
       setShowCode(true);
       setButtonText("Generate New Code");
-      navigate(`/room/${data.roomCode}`);
+      navigate(`/rooms/${data.roomCode}`);
     } else {
       alert(data.message);
     }
@@ -70,7 +70,7 @@ const Room = () => {
   const joinRoom = () => {
     const trimmed = inputCode.trim().toUpperCase();
     if (trimmed.length === 6) {
-      navigate(`/room/${trimmed}`);
+      navigate(`/rooms/${trimmed}`);
     } else {
       alert("Please enter a valid 6-character room code.");
     }

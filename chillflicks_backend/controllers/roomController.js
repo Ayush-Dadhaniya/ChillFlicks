@@ -52,3 +52,16 @@ const generateRoomCode = () => {
   }
   return result;
 };
+
+export const getRoomDetails = async (req, res) => {
+  const { roomCode } = req.params;
+  try {
+    const room = await Room.findOne({ roomCode });
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    res.status(200).json(room);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving room', error: error.message });
+  }
+};

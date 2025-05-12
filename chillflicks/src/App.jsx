@@ -18,7 +18,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route
-            path="/room"
+            path="/rooms"
             element={
               <ProtectedRoute>
                 <Room />
@@ -26,7 +26,7 @@ function App() {
             }
           />
           <Route
-            path="/room/:roomCode"
+            path="/rooms/:roomCode"
             element={
               <ProtectedRoute>
                 <Lobby />

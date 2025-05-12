@@ -24,8 +24,15 @@ const roomSchema = new mongoose.Schema({
     default: false
   },
   participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    status: {
+      type: String,
+      enum: ['host', 'active'],
+      default: 'active'
+    }
   }],
   createdAt: {
     type: Date,

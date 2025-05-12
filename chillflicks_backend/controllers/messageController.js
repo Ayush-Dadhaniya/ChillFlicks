@@ -1,17 +1,23 @@
-// controllers/messageController.js
-import Message from "../models/Message";
-import User from "../models/User"; // Assuming you have a User model
-import Room from "../models/Room"; // Assuming you have a Room model
+import Message from "../models/Message.js";
+import Room from "../models/Room.js"; // ✅ Import Room model
+import User from "../models/User.js"; // ✅ Import User model
 
-// Get messages for a specific room
 const getMessages = async (req, res) => {
   const { roomCode } = req.params;
 
   try {
-    const messages = await Message.find({ room: roomCode })
-      .populate('room')
-      .populate('sender')  // Populate sender details (User model)
-      .sort({ sentAt: -1 }); // Sort messages by sentAt in descending order
+    // Step 1: Find the room by its code
+    const room = await Room.findOne({ code: roomCode });
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    // Step 2: Find messages by room._id
+    const messages = await Message.find({ room: room._id })
+      .populate("room")
+      .populate("sender", "name") // ✅ Only populate the name of the sender
+      .sort({ sentAt: -1 });
+
     res.status(200).json(messages);
   } catch (error) {
     console.error(error);
@@ -19,25 +25,33 @@ const getMessages = async (req, res) => {
   }
 };
 
-// Post a new message to a room
 const createMessage = async (req, res) => {
   const { roomCode } = req.params;
-  const { senderId, content } = req.body;  // senderId should come from the frontend (i.e., current logged-in user)
+  const { senderId, content } = req.body;
 
   if (!senderId || !content) {
     return res.status(400).json({ error: "Sender and content are required" });
   }
 
   try {
+    // Step 1: Find the room by its code
+    const room = await Room.findOne({ code: roomCode });
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    // Step 2: Create message using room._id
     const newMessage = new Message({
-      room: roomCode,
+      room: room._id,
       sender: senderId,
       content,
       sentAt: new Date(),
     });
 
     await newMessage.save();
-    res.status(201).json(newMessage);
+    const populatedMessage = await newMessage.populate("sender", "name");
+
+    res.status(201).json(populatedMessage);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to create message" });

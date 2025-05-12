@@ -21,14 +21,15 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(path.resolve(), 'uploads')));
 
+// Avatar storage setup
 const avatarDir = path.join(path.resolve(), 'uploads/avatars');
 if (!fs.existsSync(avatarDir)) {
   fs.mkdirSync(avatarDir, { recursive: true });
@@ -40,10 +41,12 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
-  }
+  },
 });
+
 const upload = multer({ storage });
 
+// Authentication middleware
 const authenticateUser = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -62,14 +65,9 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-app.get('/', (req, res) => {
-  res.send('Hello, World!');
-});
-
-app.get('/profile', authenticateUser, (req, res) => {
-  res.json(req.user);
-});
-
+// Routes setup
+app.get('/', (req, res) => res.send('Hello, World!'));
+app.get('/profile', authenticateUser, (req, res) => res.json(req.user));
 app.post('/profile/update-avatar', authenticateUser, upload.single('avatar'), async (req, res) => {
   try {
     const avatarPath = `/uploads/avatars/${req.file.filename}`;
@@ -82,30 +80,25 @@ app.post('/profile/update-avatar', authenticateUser, upload.single('avatar'), as
   }
 });
 
-// Routes
+// Routes for auth, rooms, messages
 app.use('/auth', authRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/messages', messageRoutes);
 
-// 🧠 Track participants per room
-const participants = {};
+// Socket.IO logic
+const participants = {}; // Track participants per room
+const videoState = {}; // Track video state for each room
 
-// Endpoint to get participants in a room
-app.get('/participants/:roomId', (req, res) => {
-  const roomId = req.params.roomId;
-  const users = participants[roomId] || [];
-  res.json(users);
-});
-
-// ⚡ Socket.IO logic
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
+  // Handle user joining a room
   socket.on('joinRoom', ({ roomId, user }) => {
     socket.join(roomId);
 
     if (!participants[roomId]) {
       participants[roomId] = [];
+      videoState[roomId] = { isPlaying: false, currentTime: 0 };
     }
 
     const alreadyJoined = participants[roomId].some(u => u.id === socket.id);
@@ -115,12 +108,33 @@ io.on('connection', (socket) => {
 
     console.log(`${user} joined room: ${roomId}`);
     socket.to(roomId).emit('userJoined', `${user} joined`);
+
+    // Send current video state when a new participant joins
+    socket.emit('videoState', videoState[roomId]);
   });
 
+  // Handle message sending
   socket.on('sendMessage', ({ roomId, message, sender }) => {
     io.to(roomId).emit('receiveMessage', { message, sender });
   });
 
+  // Handle video play/pause state change
+  socket.on('updateVideoState', ({ roomId, isPlaying, currentTime }) => {
+    if (videoState[roomId]) {
+      videoState[roomId] = { isPlaying, currentTime };
+      io.to(roomId).emit('videoState', videoState[roomId]);
+    }
+  });
+
+  // Handle video time update
+  socket.on('updateVideoTime', ({ roomId, currentTime }) => {
+    if (videoState[roomId]) {
+      videoState[roomId].currentTime = currentTime;
+      io.to(roomId).emit('videoTime', currentTime);
+    }
+  });
+
+  // Handle user disconnect
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
 
@@ -133,6 +147,7 @@ io.on('connection', (socket) => {
       // Clean up empty rooms
       if (participants[roomId].length === 0) {
         delete participants[roomId];
+        delete videoState[roomId];
       }
     }
   });
