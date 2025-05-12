@@ -55,13 +55,32 @@ const generateRoomCode = () => {
 
 export const getRoomDetails = async (req, res) => {
   const { roomCode } = req.params;
+
   try {
-    const room = await Room.findOne({ roomCode });
+    const room = await Room.findOne({ roomCode })
+      .populate('host', 'username') // populate host username
+      .populate('participants.user', 'username'); // populate participant usernames
+
     if (!room) {
       return res.status(404).json({ message: 'Room not found' });
     }
-    res.status(200).json(room);
+
+    // Map participant objects to simplified format
+    const formattedParticipants = room.participants.map(p => ({
+      name: p.user.username,
+      status: p.status
+    }));
+
+    res.status(200).json({
+      videoUrl: room.videoUrl,
+      isPlaying: room.isPlaying,
+      currentPlaybackTime: room.currentPlaybackTime,
+      participants: formattedParticipants,
+      host: room.host.username
+    });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error retrieving room', error: error.message });
   }
 };
+

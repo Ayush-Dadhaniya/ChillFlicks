@@ -87,40 +87,50 @@ app.use('/auth', authRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/messages', messageRoutes);
 
-// Socket.IO logic
-const participants = {}; // Track participants per room
-const videoState = {}; // Track video state for each room
+const participants = {};
+const videoState = {};
+const messageHistory = {};
 
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
   socket.on('joinRoom', ({ roomId, user }) => {
     socket.join(roomId);
+    socket.data.roomId = roomId;
+    socket.data.user = user;
 
-    if (!participants[roomId]) {
-      participants[roomId] = [];
-      videoState[roomId] = { isPlaying: false, currentTime: 0 };
-    }
+    if (!participants[roomId]) participants[roomId] = [];
+    if (!videoState[roomId]) videoState[roomId] = { isPlaying: false, currentTime: 0 };
+    if (!messageHistory[roomId]) messageHistory[roomId] = [];
 
-    const alreadyJoined = participants[roomId].some(u => u.id === socket.id);
+    const alreadyJoined = participants[roomId].some(p => p.id === socket.id);
     if (!alreadyJoined) {
       participants[roomId].push({ id: socket.id, name: user });
     }
 
-    console.log(`${user} joined room: ${roomId}`);
-    socket.to(roomId).emit('userJoined', `${user} joined`);
+    // Notify all users in the room about updated participants
+    io.to(roomId).emit('participantJoined', participants[roomId]);
 
-    socket.emit('videoState', videoState[roomId]);
+    // Send video state to the new user
+    socket.emit('videoStateChanged', videoState[roomId]);
+
+    // Send chat history to the new user
+    socket.emit('messageHistory', messageHistory[roomId]);
+
+    console.log(`${user} joined room: ${roomId}`);
   });
 
-  socket.on('sendMessage', ({ roomId, message, sender }) => {
-    io.to(roomId).emit('receiveMessage', { message, sender });
+  socket.on('sendMessage', ({ roomId, message }) => {
+    if (!messageHistory[roomId]) messageHistory[roomId] = [];
+    messageHistory[roomId].push(message);
+
+    io.to(roomId).emit('newMessage', message);
   });
 
   socket.on('updateVideoState', ({ roomId, isPlaying, currentTime }) => {
     if (videoState[roomId]) {
       videoState[roomId] = { isPlaying, currentTime };
-      io.to(roomId).emit('videoState', videoState[roomId]);
+      io.to(roomId).emit('videoStateChanged', videoState[roomId]);
     }
   });
 
@@ -132,21 +142,23 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-
-    for (const roomId in participants) {
+    const roomId = socket.data.roomId;
+    if (roomId && participants[roomId]) {
       participants[roomId] = participants[roomId].filter(p => p.id !== socket.id);
-      io.to(roomId).emit('userLeft', socket.id);
+
+      io.to(roomId).emit('participantJoined', participants[roomId]);
 
       if (participants[roomId].length === 0) {
         delete participants[roomId];
         delete videoState[roomId];
+        delete messageHistory[roomId];
       }
     }
+
+    console.log('Client disconnected:', socket.id);
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

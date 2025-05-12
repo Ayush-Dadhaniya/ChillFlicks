@@ -6,7 +6,7 @@ const Room = () => {
 
   const [roomCode, setRoomCode] = useState("");
   const [inputCode, setInputCode] = useState("");
-  const [videoUrl, setVideoUrl] = useState(""); // <-- new state for video URL
+  const [videoUrl, setVideoUrl] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [buttonText, setButtonText] = useState("Generate Room Code");
   const [copyText, setCopyText] = useState("Click to copy room code");

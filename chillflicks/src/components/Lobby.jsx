@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 
-// Connect to the server
 const socket = io("http://localhost:3000");
 
 const Lobby = () => {
@@ -14,38 +13,29 @@ const Lobby = () => {
   const [userName, setUserName] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const playerRef = useRef(null);
 
   const API_URL = "http://localhost:3000";
 
-  // Fetch room details with improved error handling
-const fetchRoomDetails = async (token) => {
-  try {
-    console.log("Fetching room details..."); // Log the start of the fetch
-    const response = await axios.get(`${API_URL}/rooms/${roomCode}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log("Room Details Fetched:", response.data); // Log room details
-    setVideoUrl(response.data.videoUrl);
-    setIsPlaying(response.data.isPlaying);
-    setParticipants(response.data.participants); // Set participants
-  } catch (error) {
-    // Log the complete error object for debugging
-    console.error("Error fetching room details:", error);
-    if (error.response) {
-      // If the error has a response, log its data
-      console.error("Error Response Data:", error.response.data);
-      console.error("Error Response Status:", error.response.status);
-    } else if (error.request) {
-      // If there is no response but a request was made
-      console.error("Error Request:", error.request);
-    } else {
-      // If there was an issue setting up the request
-      console.error("Error Message:", error.message);
+  const extractYouTubeId = (url) => {
+    const regExp = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+    const match = url.match(regExp);
+    return match ? match[1] : null;
+  };
+
+  const fetchRoomDetails = async (token) => {
+    try {
+      const response = await axios.get(`${API_URL}/rooms/${roomCode}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVideoUrl(response.data.videoUrl);
+      setIsPlaying(response.data.isPlaying);
+      setParticipants(response.data.participants);
+    } catch (error) {
+      console.error("Error fetching room details:", error);
     }
-  }
-};
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -55,8 +45,7 @@ const fetchRoomDetails = async (token) => {
       const decoded = JSON.parse(atob(token.split('.')[1]));
       const name = decoded.username || decoded.name || "Unknown";
       setUserName(name);
-      console.log("Fetching room details...");
-      fetchRoomDetails(token); // Ensure we wait for the details
+      fetchRoomDetails(token);
     } catch (err) {
       console.error("Invalid token:", err);
     }
@@ -65,21 +54,33 @@ const fetchRoomDetails = async (token) => {
   useEffect(() => {
     if (!userName) return;
 
-    console.log(`User ${userName} joining room ${roomCode}`);
     socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
     socket.on("newMessage", (message) => {
-      console.log("New message received:", message); // Log incoming messages
       setMessages((prevMessages) => [...prevMessages, message]);
     });
 
-    socket.on("videoStateChanged", (isPlaying) => {
-      console.log("Video state changed:", isPlaying); // Log video state change
+    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
       setIsPlaying(isPlaying);
+
+      const trySyncPlayback = () => {
+        if (playerRef.current && playerReady) {
+          const state = playerRef.current.getPlayerState();
+          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
+
+          if (diff > 1) playerRef.current.seekTo(currentTime, true);
+
+          if (isPlaying && state !== 1) playerRef.current.playVideo();
+          if (!isPlaying && state === 1) playerRef.current.pauseVideo();
+        } else {
+          setTimeout(trySyncPlayback, 500);
+        }
+      };
+
+      trySyncPlayback();
     });
 
     socket.on("participantJoined", (participants) => {
-      console.log("Participants updated:", participants); // Log participants update
       setParticipants(participants);
     });
 
@@ -88,56 +89,101 @@ const fetchRoomDetails = async (token) => {
       socket.off("videoStateChanged");
       socket.off("participantJoined");
     };
-  }, [roomCode, userName]);
+  }, [roomCode, userName, playerReady]);
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      console.log("Sending message:", newMessage); // Log the message being sent
-      socket.emit("sendMessage", { roomId: roomCode, sender: userName, message: newMessage });
+      const message = {
+        user: userName,
+        text: newMessage,
+        time: new Date().toLocaleTimeString(),
+      };
+      socket.emit("sendMessage", { roomId: roomCode, message });
+      setMessages((prevMessages) => [...prevMessages, message]);
       setNewMessage("");
-    } else {
-      console.log("No message to send");
     }
   };
 
   const handlePlayPause = () => {
+    if (!playerReady || !playerRef.current) return;
+
     const newPlayState = !isPlaying;
+    const currentTime = playerRef.current.getCurrentTime();
+
     setIsPlaying(newPlayState);
-    console.log(`Video state changed to ${newPlayState ? "Playing" : "Paused"}`);
-    socket.emit("updateVideoState", { roomId: roomCode, isPlaying: newPlayState });
+    socket.emit("updateVideoState", {
+      roomId: roomCode,
+      isPlaying: newPlayState,
+      currentTime,
+    });
   };
+
+  useEffect(() => {
+    if (!videoUrl) return;
+    const videoId = extractYouTubeId(videoUrl);
+    if (!videoId) return;
+
+    const loadPlayer = () => {
+      if (playerRef.current) return;
+
+      const player = new window.YT.Player("youtube-player", {
+        videoId,
+        playerVars: {
+          modestbranding: 1,
+          rel: 0,
+          controls: 0,
+          fs: 0,
+          iv_load_policy: 3,
+          disablekb: 1,
+          autoplay: 0,
+          playsinline: 1,
+          showinfo: 0,
+        },
+        events: {
+          onReady: (event) => {
+            playerRef.current = event.target;
+            setPlayerReady(true);
+          },
+        },
+      });
+    };
+
+    if (window.YT && window.YT.Player) {
+      loadPlayer();
+    } else {
+      const existingScript = document.querySelector("script[src='https://www.youtube.com/iframe_api']");
+      if (!existingScript) {
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(tag);
+      }
+      window.onYouTubeIframeAPIReady = loadPlayer;
+    }
+  }, [videoUrl]);
 
   return (
     <div className="bg-black text-white min-h-screen p-4 flex flex-col items-center">
       <div className="mb-6 w-full max-w-6xl text-center">
-        <span className="text-lg lg:text-xl font-semibold tracking-wide bg-gradient-to-r from-pink-500 to-green-400 text-transparent bg-clip-text">
+        <span className="text-xl font-semibold bg-gradient-to-r from-pink-500 to-green-400 text-transparent bg-clip-text">
           Room Code: {roomCode}
         </span>
       </div>
 
       <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-4">
-        {/* Video Player */}
-        <div className="bg-[#121212] flex-1 rounded-xl overflow-hidden shadow-xl border border-[#00FF88] p-4 flex flex-col justify-center items-center">
-          <div className="w-full aspect-video bg-black flex items-center justify-center text-center border border-[#00FF88] rounded-lg relative">
+        <div className="bg-[#121212] flex-1 rounded-xl shadow-xl border border-[#00FF88] p-4 flex flex-col items-center">
+          <div className="w-full aspect-video bg-black border border-[#00FF88] rounded-lg relative flex items-center justify-center">
             {videoUrl ? (
-              <div className="w-full h-full relative">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={videoUrl}
-                  title="YouTube video player"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
+              <>
+                <div className="w-full h-full" id="youtube-player"></div>
                 <button
                   onClick={handlePlayPause}
-                  className="absolute bottom-5 left-1/2 transform -translate-x-1/2 text-2xl text-white bg-green-600 p-2 rounded-full"
+                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-green-500 to-blue-500 text-white text-lg font-semibold px-6 py-2 rounded-full shadow-lg hover:scale-105 transition"
                 >
-                  {isPlaying ? "Pause" : "Play"}
+                  {isPlaying ? "⏸ Pause" : "▶ Play"}
                 </button>
-              </div>
+              </>
             ) : (
-              <div>
+              <div className="text-center">
                 <button className="bg-[#FF00FF] w-16 h-16 rounded-full text-xl text-white shadow-lg mb-4">
                   ▶
                 </button>
@@ -147,9 +193,7 @@ const fetchRoomDetails = async (token) => {
           </div>
         </div>
 
-        {/* Chat and Participants */}
         <div className="flex flex-col lg:w-96 gap-4">
-          {/* Chat Box */}
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col h-[400px]">
             <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">💬 VIBE CHAT</div>
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
@@ -182,18 +226,16 @@ const fetchRoomDetails = async (token) => {
             </div>
           </div>
 
-          {/* Participants */}
-          <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col">
-            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">Participants</div>
-            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
-              {participants.map((part, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                  <span className="text-[#7dd3fc]">{part.name}</span>
-                  <span className="text-xs text-gray-400">{part.status}</span>
-                </div>
-              ))}
+          {participants.map((part, i) => (
+            <div key={i} className="flex items-center space-x-2">
+              <span className="text-[#7dd3fc]">
+                {typeof part === "object" ? part.name || "Unnamed" : "Unknown"}
+              </span>
+              <span className="text-xs text-gray-400">
+                {typeof part ? part.status || "Unknown" : ""}
+              </span>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
