@@ -10,7 +10,7 @@ export const createRoom = async (req, res) => {
       roomCode,
       host,
       videoUrl,
-      participants: [{ name: host, status: 'host' }]  // Add the host to participants
+      participants: [{ user: host, status: 'host' }]  // Add the host to participants
     });
 
     await newRoom.save();
@@ -33,9 +33,9 @@ export const joinRoom = async (req, res) => {
       return res.status(404).json({ message: "Room not found." });
     }
 
-    room.participants.push({ name: userId, status: 'active' });  // Add participant with 'active' status
+    room.participants.push({ user: userId, status: 'active' });
     await room.save();
-    
+
     res.status(200).json({ message: "Successfully joined the room." });
   } catch (error) {
     console.error(error);
@@ -54,33 +54,29 @@ const generateRoomCode = () => {
 };
 
 export const getRoomDetails = async (req, res) => {
-  const { roomCode } = req.params;
-
   try {
+    const { roomCode } = req.params;
+
     const room = await Room.findOne({ roomCode })
-      .populate('host', 'username') // populate host username
-      .populate('participants.user', 'username'); // populate participant usernames
+      .populate('participants.user', 'username fullName') // populate only username and fullName
 
     if (!room) {
       return res.status(404).json({ message: 'Room not found' });
     }
 
-    // Map participant objects to simplified format
-    const formattedParticipants = room.participants.map(p => ({
-      name: p.user.username,
+    const participants = room.participants.map((p) => ({
+      username: p.user?.username || 'Unknown',
+      fullName: p.user?.fullName || 'Unknown',
       status: p.status
     }));
 
-    res.status(200).json({
+    res.json({
+      roomCode: room.roomCode,
       videoUrl: room.videoUrl,
-      isPlaying: room.isPlaying,
-      currentPlaybackTime: room.currentPlaybackTime,
-      participants: formattedParticipants,
-      host: room.host.username
+      participants
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error retrieving room', error: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
-

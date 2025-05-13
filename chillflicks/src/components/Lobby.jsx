@@ -225,14 +225,13 @@ const Lobby = () => {
               </button>
             </div>
           </div>
-
           {participants.map((part, i) => (
             <div key={i} className="flex items-center space-x-2">
               <span className="text-[#7dd3fc]">
                 {typeof part === "object" ? part.name || "Unnamed" : "Unknown"}
               </span>
               <span className="text-xs text-gray-400">
-                {typeof part ? part.status || "Unknown" : ""}
+                {part.status}
               </span>
             </div>
           ))}
