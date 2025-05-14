@@ -25,12 +25,8 @@ const Profile = () => {
         const data = await res.json();
         setUser(data);
 
-        // If avatar exists, prepend full server path
-        if (data.avatar) {
-          setAvatarPreview(`http://localhost:3000${data.avatar}`);
-        } else {
-          setAvatarPreview(null);
-        }
+        const avatarPath = data.avatar ? data.avatar : '/uploads/avatars/default-avatar.png';
+        setAvatarPreview(`http://localhost:3000${avatarPath}`);
       } catch (err) {
         console.error(err);
       }
@@ -87,8 +83,12 @@ const Profile = () => {
       <div className="flex flex-col items-center space-y-4">
         <div className="relative">
           <img
-            src={avatarPreview || '/default_avatar.png'}
+            src={avatarPreview}
             alt="Avatar"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'http://localhost:3000/uploads/avatars/default_avatar.png';
+            }}
             className="w-32 h-32 rounded-full object-cover border-4 border-purple-500 shadow-md"
           />
           <label className="absolute bottom-0 right-0 bg-purple-600 p-2 rounded-full cursor-pointer hover:bg-purple-700 transition">

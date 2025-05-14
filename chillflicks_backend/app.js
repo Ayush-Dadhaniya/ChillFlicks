@@ -1,4 +1,3 @@
-// app.js
 import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
@@ -41,8 +40,9 @@ const upload = multer({ storage });
 // Auth middleware
 const authenticateUser = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer '))
+  if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'No token provided' });
+  }
 
   try {
     const token = authHeader.split(' ')[1];
@@ -58,14 +58,21 @@ const authenticateUser = async (req, res, next) => {
 
 // Routes
 app.get('/', (_, res) => res.send('Hello, World!'));
-app.get('/rooms/:roomCode', authenticateUser, async (req, res) => {
+
+// Profile route to fetch user data
+app.get('/profile', authenticateUser, (req, res) => {
+  res.json(req.user); // Send user data (fullName, username, email, avatar)
+});
+
+app.post('/profile/update-avatar', async (req, res) => {
   try {
-    const room = await Room.findOne({ roomCode: req.params.roomCode });
-    if (!room) return res.status(404).json({ message: "Room not found" });
-    res.json(room);
+    req.user.avatar = `/uploads/avatars/${req.file.filename}`;
+    await req.user.save();
+
+    res.json({ success: true, avatar: req.user.avatar });
   } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error(err);
+    res.status(500).json({ message: 'Failed to update avatar' });
   }
 });
 

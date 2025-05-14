@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     },
     avatar: {
         type: String, // Store the avatar URL here
-        default: '/default-avatar.png', // Default avatar if not uploaded
+        default: '/default_avatar.png' // Default avatar if not uploaded
       },
     email: {
         type: String,
