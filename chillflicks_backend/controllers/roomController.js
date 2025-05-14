@@ -1,4 +1,5 @@
 import Room from '../models/Room.js';  // import the Room model
+import User from '../models/User.js';
 
 // Create Room
 export const createRoom = async (req, res) => {
@@ -21,20 +22,25 @@ export const createRoom = async (req, res) => {
   }
 };
 
-// Join Room
 export const joinRoom = async (req, res) => {
   try {
     const { roomCode } = req.params;
-    const userId = req.body.userId; // assuming userId is sent in the body
+    const { userId } = req.body;
 
     const room = await Room.findOne({ roomCode });
+    if (!room) return res.status(404).json({ message: "Room not found." });
 
-    if (!room) {
-      return res.status(404).json({ message: "Room not found." });
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) return res.status(400).json({ message: "User not found." });
+
+    // Ensure no duplicates (use String comparison for safety)
+    const alreadyInRoom = room.participants.some(p => p.user.toString() === user._id.toString());
+    if (!alreadyInRoom) {
+      // If not already present, add user as active
+      room.participants.push({ user: user._id, status: 'active' });
+      await room.save();
     }
-
-    room.participants.push({ user: userId, status: 'active' });
-    await room.save();
 
     res.status(200).json({ message: "Successfully joined the room." });
   } catch (error) {
@@ -43,7 +49,7 @@ export const joinRoom = async (req, res) => {
   }
 };
 
-// Helper function to generate the room code
+
 const generateRoomCode = () => {
   const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
@@ -55,28 +61,17 @@ const generateRoomCode = () => {
 
 export const getRoomDetails = async (req, res) => {
   try {
-    const { roomCode } = req.params;
-
-    const room = await Room.findOne({ roomCode })
-      .populate('participants.user', 'username fullName') // populate only username and fullName
+    const room = await Room.findById(req.params.roomId)
+      .populate('participants.user', 'username name')  // Populating user details
+      .exec();
 
     if (!room) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ error: 'Room not found' });
     }
 
-    const participants = room.participants.map((p) => ({
-      username: p.user?.username || 'Unknown',
-      fullName: p.user?.fullName || 'Unknown',
-      status: p.status
-    }));
-
-    res.json({
-      roomCode: room.roomCode,
-      videoUrl: room.videoUrl,
-      participants
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    res.json(room); // Send room data with populated participants
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
   }
 };

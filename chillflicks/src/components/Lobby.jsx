@@ -3,20 +3,20 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:3000");
+const API_URL = "http://localhost:3000";
+const socket = io(API_URL);
 
 const Lobby = () => {
   const { roomCode } = useParams();
+  const playerRef = useRef(null);
+
   const [messages, setMessages] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [userName, setUserName] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [userName, setUserName] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
-  const playerRef = useRef(null);
-
-  const API_URL = "http://localhost:3000";
 
   const extractYouTubeId = (url) => {
     const regExp = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
@@ -24,28 +24,24 @@ const Lobby = () => {
     return match ? match[1] : null;
   };
 
-  const fetchRoomDetails = async (token) => {
-    try {
-      const response = await axios.get(`${API_URL}/rooms/${roomCode}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setVideoUrl(response.data.videoUrl);
-      setIsPlaying(response.data.isPlaying);
-      setParticipants(response.data.participants);
-    } catch (error) {
-      console.error("Error fetching room details:", error);
-    }
-  };
-
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
-      const decoded = JSON.parse(atob(token.split('.')[1]));
-      const name = decoded.username || decoded.name || "Unknown";
+      const decoded = JSON.parse(atob(token.split(".")[1]));
+      const name = decoded.username || decoded.name || "Guest";
       setUserName(name);
-      fetchRoomDetails(token);
+
+      axios
+        .get(`${API_URL}/rooms/${roomCode}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((res) => {
+          setVideoUrl(res.data.videoUrl);
+          setIsPlaying(res.data.isPlaying);
+          setParticipants(res.data.participants || []);
+        });
     } catch (err) {
       console.error("Invalid token:", err);
     }
@@ -56,8 +52,16 @@ const Lobby = () => {
 
     socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
-    socket.on("newMessage", (message) => {
-      setMessages((prevMessages) => [...prevMessages, message]);
+    socket.on("newMessage", (msg) => {
+      setMessages((prev) => [...prev, msg]);  // Update only for incoming messages
+    });
+
+    socket.on("messageHistory", (history) => {
+      setMessages(history);
+    });
+
+    socket.on("participantJoined", (updatedParticipants) => {
+      setParticipants(updatedParticipants);
     });
 
     socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
@@ -69,7 +73,6 @@ const Lobby = () => {
           const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
 
           if (diff > 1) playerRef.current.seekTo(currentTime, true);
-
           if (isPlaying && state !== 1) playerRef.current.playVideo();
           if (!isPlaying && state === 1) playerRef.current.pauseVideo();
         } else {
@@ -80,27 +83,23 @@ const Lobby = () => {
       trySyncPlayback();
     });
 
-    socket.on("participantJoined", (participants) => {
-      setParticipants(participants);
-    });
-
     return () => {
       socket.off("newMessage");
-      socket.off("videoStateChanged");
+      socket.off("messageHistory");
       socket.off("participantJoined");
+      socket.off("videoStateChanged");
     };
-  }, [roomCode, userName, playerReady]);
+  }, [userName, roomCode, playerReady]);
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      const message = {
+      const msg = {
         user: userName,
         text: newMessage,
         time: new Date().toLocaleTimeString(),
       };
-      socket.emit("sendMessage", { roomId: roomCode, message });
-      setMessages((prevMessages) => [...prevMessages, message]);
-      setNewMessage("");
+      socket.emit("sendMessage", { roomId: roomCode, message: msg });
+      setNewMessage("");  // Clear the input after sending the message
     }
   };
 
@@ -202,7 +201,11 @@ const Lobby = () => {
                   <span className="text-[#7dd3fc] font-semibold">
                     {msg.user} <span className="text-gray-400 text-xs">{msg.time}</span>
                   </span>
-                  <span className={`px-3 py-1 rounded-md w-fit ${msg.user === userName ? "bg-green-800 text-white" : "bg-[#2a2a2a]"}`}>
+                  <span
+                    className={`px-3 py-1 rounded-md w-fit ${
+                      msg.user === userName ? "bg-green-800 text-white" : "bg-[#2a2a2a]"
+                    }`}
+                  >
                     {msg.text}
                   </span>
                 </div>
@@ -217,24 +220,30 @@ const Lobby = () => {
                 placeholder="Send a vibe..."
                 className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
               />
-              <button
-                onClick={handleSendMessage}
-                className="text-[#00FF88] font-bold hover:text-white transition"
-              >
+              <button onClick={handleSendMessage} className="text-[#00FF88] font-bold hover:text-white transition">
                 ➤
               </button>
             </div>
           </div>
-          {participants.map((part, i) => (
-            <div key={i} className="flex items-center space-x-2">
-              <span className="text-[#7dd3fc]">
-                {typeof part === "object" ? part.name || "Unnamed" : "Unknown"}
-              </span>
-              <span className="text-xs text-gray-400">
-                {part.status}
-              </span>
-            </div>
-          ))}
+
+          {/* 👥 Participants */}
+          <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
+            <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
+            {participants.map((part, i) => (
+              <div key={i} className="flex items-center space-x-2 mb-1">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
+                ></span>
+                <span className="text-[#7dd3fc]">
+                  {part.user || part.name || part.username || "Unnamed"}
+                </span>
+                {part.status && (
+                  <span className="text-xs text-gray-400">({part.status})</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
