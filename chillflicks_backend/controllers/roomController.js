@@ -61,15 +61,14 @@ const generateRoomCode = () => {
 
 export const getRoomDetails = async (req, res) => {
   try {
-    const room = await Room.findById(req.params.roomId)
-      .populate('participants.user', 'username name')  // Populating user details
+    const room = await Room.findOne({ roomCode: req.params.roomCode })
+      .populate('participants.user', 'username name')
       .exec();
-
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
-
-    res.json(room); // Send room data with populated participants
+    console.log(room);
+    res.json(room);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

@@ -17,9 +17,10 @@ const Lobby = () => {
   const [userName, setUserName] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [videoId, setVideoId] = useState("");
 
   const extractYouTubeId = (url) => {
-    const regExp = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+    const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
     const match = url.match(regExp);
     return match ? match[1] : null;
   };
@@ -38,9 +39,14 @@ const Lobby = () => {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => {
-          setVideoUrl(res.data.videoUrl);
-          setIsPlaying(res.data.isPlaying);
-          setParticipants(res.data.participants || []);
+          const {videoUrl, isPlaying, participants } = res.data;
+          setVideoUrl(videoUrl);
+          setIsPlaying(isPlaying);
+          setParticipants(participants || []);
+          const id = extractYouTubeId(videoUrl);
+          if (id) setVideoId(id);
+          console.log("Fetched videoUrl:", videoUrl);
+          console.log("Extracted videoId:", extractYouTubeId(videoUrl));
         });
     } catch (err) {
       console.error("Invalid token:", err);
@@ -48,39 +54,31 @@ const Lobby = () => {
   }, [roomCode]);
 
   useEffect(() => {
-    if (!userName) return;
+    if (!userName || !roomCode) return;
 
     socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
-    socket.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);  // Update only for incoming messages
-    });
-
-    socket.on("messageHistory", (history) => {
-      setMessages(history);
-    });
-
-    socket.on("participantJoined", (updatedParticipants) => {
-      setParticipants(updatedParticipants);
-    });
+    socket.on("newMessage", (msg) => setMessages((prev) => [...prev, msg]));
+    socket.on("messageHistory", (history) => setMessages(history));
+    socket.on("participantJoined", setParticipants);
 
     socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
       setIsPlaying(isPlaying);
 
-      const trySyncPlayback = () => {
+      const syncPlayback = () => {
         if (playerRef.current && playerReady) {
-          const state = playerRef.current.getPlayerState();
           const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
+          const state = playerRef.current.getPlayerState();
 
           if (diff > 1) playerRef.current.seekTo(currentTime, true);
           if (isPlaying && state !== 1) playerRef.current.playVideo();
           if (!isPlaying && state === 1) playerRef.current.pauseVideo();
         } else {
-          setTimeout(trySyncPlayback, 500);
+          setTimeout(syncPlayback, 500);
         }
       };
 
-      trySyncPlayback();
+      syncPlayback();
     });
 
     return () => {
@@ -92,40 +90,46 @@ const Lobby = () => {
   }, [userName, roomCode, playerReady]);
 
   const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const msg = {
-        user: userName,
-        text: newMessage,
-        time: new Date().toLocaleTimeString(),
-      };
-      socket.emit("sendMessage", { roomId: roomCode, message: msg });
-      setNewMessage("");  // Clear the input after sending the message
-    }
+    if (!newMessage.trim()) return;
+    const msg = {
+      user: userName,
+      text: newMessage,
+      time: new Date().toLocaleTimeString(),
+    };
+    socket.emit("sendMessage", { roomId: roomCode, message: msg });
+    setNewMessage("");
   };
 
   const handlePlayPause = () => {
-    if (!playerReady || !playerRef.current) return;
-
-    const newPlayState = !isPlaying;
+    if (!playerRef.current || !playerReady) return;
+    const newState = !isPlaying;
     const currentTime = playerRef.current.getCurrentTime();
-
-    setIsPlaying(newPlayState);
+    setIsPlaying(newState);
     socket.emit("updateVideoState", {
       roomId: roomCode,
-      isPlaying: newPlayState,
+      isPlaying: newState,
       currentTime,
     });
   };
 
   useEffect(() => {
-    if (!videoUrl) return;
-    const videoId = extractYouTubeId(videoUrl);
     if (!videoId) return;
 
-    const loadPlayer = () => {
+    const loadYouTubeAPI = () => {
+      if (window.YT && window.YT.Player) {
+        createPlayer();
+      } else {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(script);
+        window.onYouTubeIframeAPIReady = createPlayer;
+      }
+    };
+
+    const createPlayer = () => {
       if (playerRef.current) return;
 
-      const player = new window.YT.Player("youtube-player", {
+      playerRef.current = new window.YT.Player("youtube-player", {
         videoId,
         playerVars: {
           modestbranding: 1,
@@ -136,29 +140,15 @@ const Lobby = () => {
           disablekb: 1,
           autoplay: 0,
           playsinline: 1,
-          showinfo: 0,
         },
         events: {
-          onReady: (event) => {
-            playerRef.current = event.target;
-            setPlayerReady(true);
-          },
+          onReady: () => setPlayerReady(true),
         },
       });
     };
 
-    if (window.YT && window.YT.Player) {
-      loadPlayer();
-    } else {
-      const existingScript = document.querySelector("script[src='https://www.youtube.com/iframe_api']");
-      if (!existingScript) {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
-      }
-      window.onYouTubeIframeAPIReady = loadPlayer;
-    }
-  }, [videoUrl]);
+    loadYouTubeAPI();
+  }, [videoId]);
 
   return (
     <div className="bg-black text-white min-h-screen p-4 flex flex-col items-center">
@@ -171,7 +161,7 @@ const Lobby = () => {
       <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-4">
         <div className="bg-[#121212] flex-1 rounded-xl shadow-xl border border-[#00FF88] p-4 flex flex-col items-center">
           <div className="w-full aspect-video bg-black border border-[#00FF88] rounded-lg relative flex items-center justify-center">
-            {videoUrl ? (
+            {videoId ? (
               <>
                 <div className="w-full h-full" id="youtube-player"></div>
                 <button
@@ -226,7 +216,6 @@ const Lobby = () => {
             </div>
           </div>
 
-          {/* 👥 Participants */}
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
             {participants.map((part, i) => (
