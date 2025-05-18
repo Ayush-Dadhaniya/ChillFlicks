@@ -198,12 +198,7 @@ const Lobby = () => {
           <h3 className="text-lg font-semibold mb-2">Participants</h3>
           <ul>
             {participants.map((p, i) => (
-              <li key={i} className="flex items-center mb-2">
-                <img
-                  src={`${API_URL}${p.user.avatar}`}
-                  alt="avatar"
-                  className="w-8 h-8 rounded-full mr-2 object-cover border"
-                />
+              <li key={i} className="mb-1">
                 <span>{p.user.username}</span>
                 {p.status === 'host' && <span className="ml-2 text-yellow-400 text-sm">(Host)</span>}
               </li>

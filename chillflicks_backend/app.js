@@ -93,7 +93,15 @@ io.on('connection', (socket) => {
     const alreadyInRoom = room.some(p => p.id === socket.id);
     if (!alreadyInRoom) {
       const userData = await User.findOne({ username: user }).select('username avatar');
-      room.push({ id: socket.id, user: userData, status: isHost ? 'host' : 'active' });
+      const alreadyExists = room.some(p => p.user.username === userData.username);
+      if (!alreadyExists) {
+        room.push({
+          id: socket.id,
+          user: userData,
+          status: isHost ? 'host' : 'active',
+        });
+      }
+
     }
 
     state.messages[roomId] ||= [];
