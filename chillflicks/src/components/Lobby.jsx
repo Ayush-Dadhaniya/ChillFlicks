@@ -58,7 +58,7 @@ const Lobby = () => {
 
     socket.on("newMessage", (msg) => setMessages((prev) => [...prev, msg]));
     socket.on("messageHistory", (history) => setMessages(history));
-    socket.on("participantJoined", setParticipants);
+    socket.on("participantJoined", setParticipants);  
 
     socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
       setIsPlaying(isPlaying);
