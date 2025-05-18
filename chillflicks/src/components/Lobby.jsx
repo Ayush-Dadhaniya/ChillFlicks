@@ -217,20 +217,20 @@ const Lobby = () => {
 
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-            {participants.map(participant => (
-              <div className="flex items-center space-x-2 mb-1">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: participant.status === "host" ? "#FFD700" : "#32CD32" }}
-                ></span>
-                <span className="text-[#7dd3fc]">
-                  <p key={participant.user._id}>{participant.user.username}</p>
-                </span>
-                {participant.status && (
-                  <p key={participant.user._id}>{participant.status}</p>
-                )}
-              </div>
-            ))}
+              {participants.map(participant => (
+                <div key={participant._id} className="flex items-center space-x-2 mb-1">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: participant.status === "host" ? "#FFD700" : "#32CD32" }}
+                  ></span>
+                  <span className="text-[#7dd3fc]">
+                    {participant.user?.username || 'Unknown'}
+                  </span>
+                  {participant.status && (
+                    <span className="text-gray-400">({participant.status})</span>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       </div>
