@@ -137,23 +137,23 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const { roomId } = socket.data;
-    if (!roomId) return;
+  const { roomId } = socket.data;
+  if (!roomId) return;
 
-    const room = state.participants[roomId];
-    if (room) {
-      state.participants[roomId] = room.filter(p => p.id !== socket.id);
-      io.to(roomId).emit('participantJoined', state.participants[roomId]);
+  const room = state.participants[roomId];
+  if (room) {
+    state.participants[roomId] = room.filter(p => p.id !== socket.id);
+    const remaining = state.participants[roomId];
 
-      if (state.participants[roomId].length === 0) {
-        delete state.participants[roomId];
-        delete state.videoState[roomId];
-        delete state.messages[roomId];
-      }
+    // Reassign host if host left
+    if (!remaining.some(p => p.status === 'host') && remaining.length > 0) {
+      remaining[0].status = 'host'; // Make first participant the new host
     }
 
-    console.log(`Disconnected: ${socket.id}`);
-  });
+    io.to(roomId).emit('participantJoined', remaining);
+    console.log(`${socket.data.user} disconnected from room ${roomId}`);
+  }
+});
 });
 
 const PORT = process.env.PORT || 3000;
