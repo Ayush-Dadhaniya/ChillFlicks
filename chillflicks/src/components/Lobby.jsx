@@ -218,7 +218,7 @@ const Lobby = () => {
 
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-            {room.participants.map(participant => (
+            {participants.map(participant => (
               <div className="flex items-center space-x-2 mb-1">
                 <span
                   className="w-2 h-2 rounded-full"
