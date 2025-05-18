@@ -4,11 +4,11 @@ import axios from "axios";
 import io from "socket.io-client";
 
 const API_URL = "https://chillflicks.up.railway.app";
-const socket = io(API_URL);
 
 const Lobby = () => {
   const { roomCode } = useParams();
   const playerRef = useRef(null);
+  const socketRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
   const [participants, setParticipants] = useState([]);
@@ -43,7 +43,6 @@ const Lobby = () => {
           setVideoUrl(videoUrl);
           setIsPlaying(isPlaying);
           setParticipants(participants || []);
-          console.log("Participants:", participants);
           const id = extractYouTubeId(videoUrl);
           if (id) setVideoId(id);
         });
@@ -55,12 +54,20 @@ const Lobby = () => {
   useEffect(() => {
     if (!userName || !roomCode) return;
 
-    socket.emit("joinRoom", { roomId: roomCode, user: userName });
+    socketRef.current = io(API_URL);
 
-    socket.on("newMessage", (msg) => setMessages((prev) => [...prev, msg]));
-    socket.on("messageHistory", (history) => setMessages(history));
-    socket.on("participantJoined", setParticipants);  
-    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
+    socketRef.current.emit("joinRoom", { roomId: roomCode, user: userName });
+
+    socketRef.current.on("newMessage", (msg) =>
+      setMessages((prev) => [...prev, msg])
+    );
+    socketRef.current.on("messageHistory", (history) =>
+      setMessages(history)
+    );
+    socketRef.current.on("participantJoined", (updated) =>
+      setParticipants(updated)
+    );
+    socketRef.current.on("videoStateChanged", ({ isPlaying, currentTime }) => {
       setIsPlaying(isPlaying);
 
       const syncPlayback = () => {
@@ -80,10 +87,7 @@ const Lobby = () => {
     });
 
     return () => {
-      socket.off("newMessage");
-      socket.off("messageHistory");
-      socket.off("participantJoined");
-      socket.off("videoStateChanged");
+      socketRef.current.disconnect();
     };
   }, [userName, roomCode, playerReady]);
 
@@ -94,7 +98,7 @@ const Lobby = () => {
       text: newMessage,
       time: new Date().toLocaleTimeString(),
     };
-    socket.emit("sendMessage", { roomId: roomCode, message: msg });
+    socketRef.current.emit("sendMessage", { roomId: roomCode, message: msg });
     setNewMessage("");
   };
 
@@ -103,7 +107,7 @@ const Lobby = () => {
     const newState = !isPlaying;
     const currentTime = playerRef.current.getCurrentTime();
     setIsPlaying(newState);
-    socket.emit("updateVideoState", {
+    socketRef.current.emit("updateVideoState", {
       roomId: roomCode,
       isPlaying: newState,
       currentTime,
@@ -182,7 +186,9 @@ const Lobby = () => {
 
         <div className="flex flex-col lg:w-96 gap-4">
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col h-[400px]">
-            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">💬 VIBE CHAT</div>
+            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">
+              💬 VIBE CHAT
+            </div>
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
               {messages.map((msg, i) => (
                 <div key={i} className="flex flex-col">
@@ -216,15 +222,19 @@ const Lobby = () => {
 
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-            {participants.map((participant) => {
+            {participants.map((participant, index) => {
+              const username =
+                participant?.user?.username ||
+                participant?.user?.name ||
+                participant?.username ||
+                participant?.name ||
+                participant?.user?._id ||
+                "Unknown";
+              const isHost = participant?.status === "host";
               return (
-                <div key={participant._id} className="flex items-center space-x-2 mb-1">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: participant.status === "host" ? "#FFD700" : "#32CD32" }}
-                  ></span>
-                  <span className="text-[#7dd3fc]">{participant.user._id}</span>
-                  <span className="text-sm text-gray-400">({participant.status})</span>
+                <div key={participant._id || index} className="flex items-center space-x-2 mb-1">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isHost ? "#FFD700" : "#00FF88" }} />
+                  <span>{username} {isHost && "(Host)"}</span>
                 </div>
               );
             })}
