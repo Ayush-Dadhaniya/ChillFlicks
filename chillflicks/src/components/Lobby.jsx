@@ -160,62 +160,89 @@ const Lobby = () => {
     }
   }, [videoUrl]);
 
-  return (
-    <div className="bg-black text-white min-h-screen p-4 flex flex-col items-center">
-      <h2 className="text-xl mb-2">Room: {roomCode}</h2>
-      <div id="youtube-player" className="w-full max-w-3xl aspect-video mb-4" />
-      <button onClick={handlePlayPause} className="mb-4 bg-blue-600 px-4 py-2 rounded">
-        {isPlaying ? "Pause" : "Play"}
-      </button>
+return (
+  <div className="bg-black min-h-screen text-white font-sans flex flex-col items-center justify-start p-4 space-y-4">
+    {/* Video Player */}
+    <div className="relative w-full max-w-5xl aspect-video rounded-xl border border-gray-700 shadow-2xl bg-gradient-to-tr from-[#0f0f0f] to-[#1a1a1a]">
+      <div id="youtube-player" className="w-full h-full rounded-xl" />
+      {!isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center text-center">
+          <button
+            onClick={handlePlayPause}
+            className="bg-pink-600 text-white text-4xl p-6 rounded-full shadow-md hover:scale-110 transition"
+          >
+            ▶
+          </button>
+          <p className="absolute bottom-10 w-full text-green-400 text-xl animate-pulse">WAITING FOR HOST</p>
+        </div>
+      )}
+    </div>
 
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="col-span-2 bg-gray-800 p-4 rounded">
-          <h3 className="text-lg font-semibold mb-2">Chat</h3>
-          <div className="h-64 overflow-y-auto mb-2 border border-gray-600 p-2 rounded">
-            {messages.map((msg, i) => (
-              <div key={i} className="mb-1">
-                <strong>{msg.user}</strong>: {msg.text} <span className="text-gray-400 text-xs">({msg.time})</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex">
-            <input
-              className="flex-grow p-2 rounded-l bg-gray-700 border border-gray-600"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-            />
-            <button
-              className="bg-green-600 px-4 rounded-r"
-              onClick={handleSendMessage}
-            >
-              Send
-            </button>
+    {/* Chat + Squad */}
+    <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Vibe Chat */}
+      <div className="col-span-2 rounded-xl bg-gradient-to-br from-purple-800 to-pink-700 p-4 shadow-lg">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-bold tracking-wider">VIBE CHAT</h3>
+          <div className="bg-yellow-400 text-black rounded-full px-2 py-1 text-xs font-bold">
+            🔥 23 VIBING
           </div>
         </div>
-
-        <div className="bg-gray-800 p-4 rounded">
-          <h3 className="text-lg font-semibold mb-2">Participants</h3>
-          <ul>
-            {participants.map((p, i) => (
-              <li key={i} className="flex items-center space-x-2 mb-2" title={p.status}>
-                <img
-                  src={p.user.avatar || "/default_avatar.png"}
-                  alt={`${p.user.username}'s avatar`}
-                  className="w-8 h-8 rounded-full border border-gray-500"
-                  onError={(e) => (e.target.src = "/default_avatar.png")}
-                />
-                <span className="font-medium">{p.user.username}</span>
-                <span className={`text-sm ${p.status === "host" ? "text-yellow-400" : "text-blue-400"}`}>
-                  ({p.status === "host" ? "Host" : "Guest"})
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="h-64 overflow-y-auto bg-black bg-opacity-20 rounded-lg p-3 space-y-2 custom-scrollbar">
+          {messages.map((msg, i) => (
+            <div key={i} className="p-2 bg-black bg-opacity-50 rounded-md">
+              <span className="font-bold text-[cyan]">{msg.user}</span>{" "}
+              <span className="text-white">{msg.text}</span>{" "}
+              <span className="text-gray-400 text-xs">({msg.time})</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex mt-2">
+          <input
+            className="flex-grow px-4 py-2 rounded-l bg-gray-900 border border-gray-700 focus:outline-none text-white"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Send a vibe..."
+          />
+          <button
+            className="bg-green-500 px-4 py-2 rounded-r hover:bg-green-600 transition"
+            onClick={handleSendMessage}
+          >
+            ➤
+          </button>
         </div>
       </div>
+
+      {/* Squad Section */}
+      <div className="rounded-xl bg-gradient-to-br from-green-400 to-green-600 p-4 shadow-lg text-black">
+        <h3 className="text-lg font-bold mb-3">SQUAD</h3>
+        <ul className="space-y-2">
+          {participants.map((p, i) => (
+            <li key={i} className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img
+                    src={p.user.avatar || "/default_avatar.png"}
+                    alt={`${p.user.username}'s avatar`}
+                    onError={(e) => (e.target.src = "/default_avatar.png")}
+                  />
+                </div>
+                <span className="font-medium">{p.user.username}</span>
+              </div>
+              <div className="text-xs">
+                {p.status === "host" ? (
+                  <span className="text-yellow-700 font-bold">👑 Host</span>
+                ) : (
+                  <span className="text-blue-700 font-semibold">🎥 Watching</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default Lobby;
