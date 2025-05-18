@@ -1,6 +1,25 @@
 import Room from '../models/Room.js';  // import the Room model
 import User from '../models/User.js';
 
+// Update video state (play/pause + timestamp)
+export const updateVideoState = async (req, res) => {
+  const { roomCode } = req.params;
+  const { isPlaying, currentPlaybackTime } = req.body;
+
+  try {
+    const room = await Room.findOne({ roomCode });
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    room.isPlaying = isPlaying;
+    room.currentPlaybackTime = currentPlaybackTime;
+    await room.save();
+
+    res.status(200).json({ message: 'Video state updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // Create Room
 export const createRoom = async (req, res) => {
   try {
@@ -62,7 +81,7 @@ const generateRoomCode = () => {
 export const getRoomDetails = async (req, res) => {
   try {
     const room = await Room.findOne({ roomCode: req.params.roomCode })
-      .populate('participants.user', 'username')
+      .populate("participants.user", "username fullName _id")
       .exec();
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });

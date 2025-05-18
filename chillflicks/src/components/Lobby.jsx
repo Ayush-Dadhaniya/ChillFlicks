@@ -41,7 +41,6 @@ const Lobby = () => {
           setVideoUrl(res.data.videoUrl);
           setIsPlaying(res.data.isPlaying);
           setParticipants(res.data.participants || []);
-          console.log("Participants:", res.data.participants);
         });
     } catch (err) {
       console.error("Invalid token:", err);
@@ -54,7 +53,7 @@ const Lobby = () => {
     socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
     socket.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);  // Update only for incoming messages
+      setMessages((prev) => [...prev, msg]);
     });
 
     socket.on("messageHistory", (history) => {
@@ -100,7 +99,7 @@ const Lobby = () => {
         time: new Date().toLocaleTimeString(),
       };
       socket.emit("sendMessage", { roomId: roomCode, message: msg });
-      setNewMessage("");  // Clear the input after sending the message
+      setNewMessage("");
     }
   };
 
@@ -163,88 +162,53 @@ const Lobby = () => {
 
   return (
     <div className="bg-black text-white min-h-screen p-4 flex flex-col items-center">
-      <div className="mb-6 w-full max-w-6xl text-center">
-        <span className="text-xl font-semibold bg-gradient-to-r from-pink-500 to-green-400 text-transparent bg-clip-text">
-          Room Code: {roomCode}
-        </span>
-      </div>
+      <h2 className="text-xl mb-2">Room: {roomCode}</h2>
+      <div id="youtube-player" className="w-full max-w-3xl aspect-video mb-4" />
+      <button onClick={handlePlayPause} className="mb-4 bg-blue-600 px-4 py-2 rounded">
+        {isPlaying ? "Pause" : "Play"}
+      </button>
 
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-4">
-        <div className="bg-[#121212] flex-1 rounded-xl shadow-xl border border-[#00FF88] p-4 flex flex-col items-center">
-          <div className="w-full aspect-video bg-black border border-[#00FF88] rounded-lg relative flex items-center justify-center">
-            {videoUrl ? (
-              <>
-                <div className="w-full h-full" id="youtube-player"></div>
-                <button
-                  onClick={handlePlayPause}
-                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-green-500 to-blue-500 text-white text-lg font-semibold px-6 py-2 rounded-full shadow-lg hover:scale-105 transition"
-                >
-                  {isPlaying ? "⏸ Pause" : "▶ Play"}
-                </button>
-              </>
-            ) : (
-              <div className="text-center">
-                <button className="bg-[#FF00FF] w-16 h-16 rounded-full text-xl text-white shadow-lg mb-4">
-                  ▶
-                </button>
-                <p className="text-green-400 font-bold">WAITING FOR HOST</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col lg:w-96 gap-4">
-          <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col h-[400px]">
-            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">💬 VIBE CHAT</div>
-            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
-              {messages.map((msg, i) => (
-                <div key={i} className="flex flex-col">
-                  <span className="text-[#7dd3fc] font-semibold">
-                    {msg.user} <span className="text-gray-400 text-xs">{msg.time}</span>
-                  </span>
-                  <span
-                    className={`px-3 py-1 rounded-md w-fit ${
-                      msg.user === userName ? "bg-green-800 text-white" : "bg-[#2a2a2a]"
-                    }`}
-                  >
-                    {msg.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center border-t border-gray-700 px-4 py-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                placeholder="Send a vibe..."
-                className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
-              />
-              <button onClick={handleSendMessage} className="text-[#00FF88] font-bold hover:text-white transition">
-                ➤
-              </button>
-            </div>
-          </div>
-
-          {/* 👥 Participants */}
-          <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
-            <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-            {participants.map((part, i) => (
-              <div key={i} className="flex items-center space-x-2 mb-1">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
-                ></span>
-                <span className="text-[#7dd3fc]">
-                  {part.user?.username || part.user?.name || part.user?._id || "Unnamed"}
-                </span>
-                {part.status && (
-                  <span className="text-xs text-gray-400">({part.status})</span>
-                )}
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="col-span-2 bg-gray-800 p-4 rounded">
+          <h3 className="text-lg font-semibold mb-2">Chat</h3>
+          <div className="h-64 overflow-y-auto mb-2 border border-gray-600 p-2 rounded">
+            {messages.map((msg, i) => (
+              <div key={i} className="mb-1">
+                <strong>{msg.user}</strong>: {msg.text} <span className="text-gray-400 text-xs">({msg.time})</span>
               </div>
             ))}
           </div>
+          <div className="flex">
+            <input
+              className="flex-grow p-2 rounded-l bg-gray-700 border border-gray-600"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+            />
+            <button
+              className="bg-green-600 px-4 rounded-r"
+              onClick={handleSendMessage}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-4 rounded">
+          <h3 className="text-lg font-semibold mb-2">Participants</h3>
+          <ul>
+            {participants.map((p, i) => (
+              <li key={i} className="flex items-center mb-2">
+                <img
+                  src={`${API_URL}${p.user.avatar}`}
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full mr-2 object-cover border"
+                />
+                <span>{p.user.username}</span>
+                {p.status === 'host' && <span className="ml-2 text-yellow-400 text-sm">(Host)</span>}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>

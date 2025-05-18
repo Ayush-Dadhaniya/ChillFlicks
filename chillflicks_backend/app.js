@@ -27,7 +27,6 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(path.resolve(), 'uploads')));
 
-// Multer setup
 const avatarDir = path.join(path.resolve(), 'uploads/avatars');
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
@@ -37,7 +36,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Auth middleware
 const authenticateUser = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -56,19 +54,16 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-// Routes
 app.get('/', (_, res) => res.send('Hello, World!'));
 
-// Profile route to fetch user data
 app.get('/profile', authenticateUser, (req, res) => {
-  res.json(req.user); // Send user data (fullName, username, email, avatar)
+  res.json(req.user);
 });
 
-app.post('/profile/update-avatar', async (req, res) => {
+app.post('/profile/update-avatar', upload.single('avatar'), async (req, res) => {
   try {
     req.user.avatar = `/uploads/avatars/${req.file.filename}`;
     await req.user.save();
-
     res.json({ success: true, avatar: req.user.avatar });
   } catch (err) {
     console.error(err);
@@ -80,17 +75,15 @@ app.use('/auth', authRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/messages', messageRoutes);
 
-// In-memory state
 const state = {
   participants: {},
-  videoState: {},
   messages: {},
 };
 
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
 
-  socket.on('joinRoom', ({ roomId, user }) => {
+  socket.on('joinRoom', async ({ roomId, user }) => {
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.user = user;
@@ -98,18 +91,23 @@ io.on('connection', (socket) => {
     const room = state.participants[roomId] ||= [];
     const isHost = room.length === 0;
     const alreadyInRoom = room.some(p => p.id === socket.id);
-
     if (!alreadyInRoom) {
-      room.push({ id: socket.id, user, status: isHost ? 'host' : 'active' });
+      const userData = await User.findOne({ username: user }).select('username avatar');
+      room.push({ id: socket.id, user: userData, status: isHost ? 'host' : 'active' });
     }
 
-    state.videoState[roomId] ||= { isPlaying: false, currentTime: 0 };
     state.messages[roomId] ||= [];
 
-    io.to(roomId).emit('participantJoined', room);
-    socket.emit('videoStateChanged', state.videoState[roomId]);
-    socket.emit('messageHistory', state.messages[roomId]);
+    const dbRoom = await Room.findOne({ roomCode: roomId });
+    if (dbRoom) {
+      socket.emit('videoStateChanged', {
+        isPlaying: dbRoom.isPlaying,
+        currentTime: dbRoom.currentPlaybackTime
+      });
+    }
 
+    socket.emit('messageHistory', state.messages[roomId]);
+    io.to(roomId).emit('participantJoined', room);
     console.log(`${user} joined room ${roomId}`);
   });
 
@@ -119,41 +117,51 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('newMessage', message);
   });
 
-  socket.on('updateVideoState', ({ roomId, isPlaying, currentTime }) => {
-    const roomState = state.videoState[roomId];
-    if (roomState) {
-      roomState.isPlaying = isPlaying;
-      roomState.currentTime = currentTime;
-      io.to(roomId).emit('videoStateChanged', roomState);
+  socket.on('updateVideoState', async ({ roomId, isPlaying, currentTime }) => {
+    try {
+      const dbRoom = await Room.findOne({ roomCode: roomId });
+      if (dbRoom) {
+        dbRoom.isPlaying = isPlaying;
+        dbRoom.currentPlaybackTime = currentTime;
+        await dbRoom.save();
+        io.to(roomId).emit('videoStateChanged', {
+          isPlaying: dbRoom.isPlaying,
+          currentTime: dbRoom.currentPlaybackTime
+        });
+      }
+    } catch (error) {
+      console.error('Error updating DB video state:', error);
     }
   });
 
-  socket.on('updateVideoTime', ({ roomId, currentTime }) => {
-    const roomState = state.videoState[roomId];
-    if (roomState) {
-      roomState.currentTime = currentTime;
-      io.to(roomId).emit('videoTime', currentTime);
+  socket.on('updateVideoTime', async ({ roomId, currentTime }) => {
+    try {
+      const dbRoom = await Room.findOne({ roomCode: roomId });
+      if (dbRoom) {
+        dbRoom.currentPlaybackTime = currentTime;
+        await dbRoom.save();
+        io.to(roomId).emit('videoTime', currentTime);
+      }
+    } catch (error) {
+      console.error('Error updating DB video time:', error);
     }
   });
 
   socket.on('disconnect', () => {
-  const { roomId } = socket.data;
-  if (!roomId) return;
+    const { roomId } = socket.data;
+    if (!roomId) return;
 
-  const room = state.participants[roomId];
-  if (room) {
-    state.participants[roomId] = room.filter(p => p.id !== socket.id);
-    const remaining = state.participants[roomId];
-
-    // Reassign host if host left
-    if (!remaining.some(p => p.status === 'host') && remaining.length > 0) {
-      remaining[0].status = 'host'; // Make first participant the new host
+    const room = state.participants[roomId];
+    if (room) {
+      state.participants[roomId] = room.filter(p => p.id !== socket.id);
+      const remaining = state.participants[roomId];
+      if (!remaining.some(p => p.status === 'host') && remaining.length > 0) {
+        remaining[0].status = 'host';
+      }
+      io.to(roomId).emit('participantJoined', remaining);
+      console.log(`${socket.data.user} disconnected from room ${roomId}`);
     }
-
-    io.to(roomId).emit('participantJoined', remaining);
-    console.log(`${socket.data.user} disconnected from room ${roomId}`);
-  }
-});
+  });
 });
 
 const PORT = process.env.PORT || 3000;
