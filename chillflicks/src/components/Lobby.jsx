@@ -1,327 +1,246 @@
-// File: Lobby.jsx
-import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-import io from "socket.io-client";
+import React, { useEffect, useState, useRef } from "react";
 
-const API_URL = "http://localhost:3000";
-const socket = io(API_URL);
+const emojis = [
+  "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊",
+  "😋", "😎", "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗",
+  "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥",
+];
 
-const Lobby = () => {
-  const { roomCode } = useParams();
-  const playerRef = useRef(null);
-  const playerContainerRef = useRef(null);
-
-  const [messages, setMessages] = useState([]);
-  const [participants, setParticipants] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
+const Lobby = ({ userName, roomId, socket }) => {
   const [videoUrl, setVideoUrl] = useState("");
-  const [userName, setUserName] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
-  const [volume, setVolume] = useState(100);
-  const [isMuted, setIsMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const [participants, setParticipants] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const videoContainerRef = useRef(null);
+  const videoRef = useRef(null);
 
-  const extractYouTubeId = (url) => {
-    const regExp =
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
-    const match = url.match(regExp);
-    return match ? match[1] : null;
-  };
-
+  // Sync playback and video URL from server via socket
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    socket.on("room_data", (data) => {
+      setVideoUrl(data.videoUrl);
+      setIsPlaying(data.isPlaying);
+      setCurrentTime(data.currentTime);
+      setParticipants(data.participants);
+      setMessages(data.messages);
+    });
 
-    try {
-      const decoded = JSON.parse(atob(token.split(".")[1]));
-      const name = decoded.username || decoded.name || "Guest";
-      setUserName(name);
-
-      axios
-        .get(`${API_URL}/rooms/${roomCode}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => {
-          setVideoUrl(res.data.videoUrl);
-          setIsPlaying(res.data.isPlaying);
-          setParticipants(res.data.participants || []);
-        });
-    } catch (err) {
-      console.error("Invalid token:", err);
-    }
-  }, [roomCode]);
-
-  useEffect(() => {
-    if (!userName) return;
-
-    socket.emit("joinRoom", { roomId: roomCode, user: userName });
-
-    socket.on("newMessage", (msg) => {
+    socket.on("new_message", (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
 
-    socket.on("messageHistory", (history) => {
-      setMessages(history);
+    socket.on("participants_update", (list) => {
+      setParticipants(list);
     });
 
-    socket.on("participantJoined", (updatedParticipants) => {
-      setParticipants(updatedParticipants);
-    });
-
-    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
-      setIsPlaying(isPlaying);
-
-      const trySyncPlayback = () => {
-        if (playerRef.current && playerReady) {
-          const state = playerRef.current.getPlayerState();
-          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
-
-          if (diff > 1) playerRef.current.seekTo(currentTime, true);
-          if (isPlaying && state !== 1) playerRef.current.playVideo();
-          if (!isPlaying && state === 1) playerRef.current.pauseVideo();
-        } else {
-          setTimeout(trySyncPlayback, 500);
-        }
-      };
-
-      trySyncPlayback();
-    });
-
+    // Cleanup listeners on unmount
     return () => {
-      socket.off("newMessage");
-      socket.off("messageHistory");
-      socket.off("participantJoined");
-      socket.off("videoStateChanged");
+      socket.off("room_data");
+      socket.off("new_message");
+      socket.off("participants_update");
     };
-  }, [userName, roomCode, playerReady]);
-
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const msg = {
-        user: userName,
-        text: newMessage,
-        time: new Date().toLocaleTimeString(),
-      };
-      socket.emit("sendMessage", { roomId: roomCode, message: msg });
-      setNewMessage("");
-    }
-  };
-
-  const handlePlayPause = () => {
-    if (!playerReady || !playerRef.current) return;
-
-    const newPlayState = !isPlaying;
-    const currentTime = playerRef.current.getCurrentTime();
-
-    setIsPlaying(newPlayState);
-    socket.emit("updateVideoState", {
-      roomId: roomCode,
-      isPlaying: newPlayState,
-      currentTime,
-    });
-  };
-
-  // Zoom toggle
-  const toggleZoom = () => {
-    setIsZoomed((z) => !z);
-  };
-
-  // Volume change handler
-  const handleVolumeChange = (e) => {
-    const vol = Number(e.target.value);
-    setVolume(vol);
-    if (playerRef.current) {
-      playerRef.current.setVolume(vol);
-      if (vol === 0) {
-        setIsMuted(true);
-      } else {
-        setIsMuted(false);
-      }
-    }
-  };
-
-  // Mute/unmute toggle
-  const toggleMute = () => {
-    if (!playerRef.current) return;
-    if (isMuted) {
-      playerRef.current.unMute();
-      setIsMuted(false);
-      setVolume(playerRef.current.getVolume());
-    } else {
-      playerRef.current.mute();
-      setIsMuted(true);
-      setVolume(0);
-    }
-  };
+  }, [socket]);
 
   useEffect(() => {
-    if (!videoUrl) return;
-    const videoId = extractYouTubeId(videoUrl);
-    if (!videoId) return;
-
-    const loadPlayer = () => {
-      if (playerRef.current) return;
-
-      const player = new window.YT.Player("youtube-player", {
-        videoId,
-        playerVars: {
-          modestbranding: 0,
-          rel: 0,
-          controls: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          disablekb: 1,
-          autoplay: 0,
-          playsinline: 1,
-          showinfo: 0,
-        },
-        events: {
-          onReady: (event) => {
-            playerRef.current = event.target;
-            setPlayerReady(true);
-            playerRef.current.setVolume(volume);
-          },
-        },
-      });
-    };
-
-    if (window.YT && window.YT.Player) {
-      loadPlayer();
-    } else {
-      const existingScript = document.querySelector(
-        "script[src='https://www.youtube.com/iframe_api']"
-      );
-      if (!existingScript) {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
+    if (videoRef.current) {
+      videoRef.current.currentTime = currentTime;
+      if (isPlaying) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
       }
-      window.onYouTubeIframeAPIReady = loadPlayer;
+      videoRef.current.volume = volume;
     }
-  }, [videoUrl]);
+  }, [videoUrl, isPlaying, currentTime, volume]);
+
+  const handlePlayPause = () => {
+    socket.emit("toggle_play");
+  };
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    socket.emit("seek", time);
+  };
+
+  const handleVolumeChange = (e) => {
+    const vol = parseFloat(e.target.value);
+    setVolume(vol);
+    if (videoRef.current) videoRef.current.volume = vol;
+  };
+
+  const handleSendMessage = () => {
+    if (newMessage.trim() === "") return;
+    const msg = {
+      user: userName,
+      text: newMessage,
+      time: new Date().toLocaleTimeString(),
+    };
+    socket.emit("send_message", msg);
+    setMessages((prev) => [...prev, msg]);
+    setNewMessage("");
+    setShowEmojiPicker(false);
+  };
+
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker((prev) => !prev);
+  };
+
+  const addEmoji = (emoji) => {
+    setNewMessage((prev) => prev + emoji);
+  };
+
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (videoContainerRef.current.requestFullscreen) {
+        videoContainerRef.current.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   return (
-    <div className="bg-[#0f0f0f] text-white min-h-screen p-6 font-sans">
-      <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] mb-6 text-center">
-        Room Code: {roomCode}
-      </h2>
+    <div className="p-4 min-h-screen bg-gradient-to-r from-gray-900 to-gray-800 text-white flex flex-col gap-6">
+      <h1 className="text-3xl font-bold mb-4">Room: {roomId}</h1>
 
-      <div className="flex flex-col lg:flex-row gap-6 justify-center items-start">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Video Section */}
         <div
-          className={`w-full lg:w-2/3 transition-transform duration-300 ${
-            isZoomed ? "scale-125" : "scale-100"
-          }`}
-          ref={playerContainerRef}
+          ref={videoContainerRef}
+          className="flex-1 bg-black rounded-xl shadow-lg relative flex flex-col"
         >
-          <div
-            id="youtube-player"
-            className="aspect-video w-full rounded-xl shadow-cyan-200"
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="w-full rounded-t-xl bg-black"
+            controls={false}
           />
-          {/* Custom Controls */}
-          <div className="flex items-center mt-4 space-x-4">
+          <div className="flex items-center justify-between p-3 bg-[#111] rounded-b-xl">
             <button
               onClick={handlePlayPause}
-              className="px-6 py-2 text-white font-semibold rounded-full bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] hover:from-[#00d0dd] hover:to-[#6a00cc] shadow-lg transition"
+              className="bg-pink-600 hover:bg-pink-700 px-4 py-2 rounded-md font-semibold"
+              aria-label={isPlaying ? "Pause video" : "Play video"}
             >
-              {isPlaying ? "Pause Video" : "Play Video"}
+              {isPlaying ? "Pause" : "Play"}
             </button>
+
+            <input
+              type="range"
+              min="0"
+              max={videoRef.current ? videoRef.current.duration : 0}
+              value={currentTime}
+              onChange={handleSeek}
+              step="0.1"
+              className="flex-grow mx-4 cursor-pointer"
+            />
+
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="w-24 cursor-pointer"
+            />
 
             <button
-              onClick={toggleZoom}
-              className={`px-4 py-2 rounded-full font-semibold shadow-lg transition ${
-                isZoomed
-                  ? "bg-purple-700 hover:bg-purple-900 text-white"
-                  : "bg-[#7f00ff] hover:bg-[#5a00cc] text-white"
-              }`}
-              title="Toggle Zoom"
+              onClick={toggleFullscreen}
+              className="ml-4 bg-purple-700 hover:bg-purple-800 px-3 py-1 rounded-md font-semibold"
+              aria-label="Toggle fullscreen"
+              title="Toggle fullscreen"
             >
-              {isZoomed ? "Normal Size" : "Magnify"}
+              ⛶
             </button>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={toggleMute}
-                className="px-3 py-1 rounded-full bg-[#7f00ff] hover:bg-[#5a00cc] text-white shadow-lg transition"
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? "Unmute" : "Mute"}
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={volume}
-                onChange={handleVolumeChange}
-                className="w-24 cursor-pointer"
-                title="Volume"
-              />
-            </div>
           </div>
         </div>
 
-        {/* Chat & Participants */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-6">
-          {/* Chat */}
-          <div className="bg-[#1a1a1a] border border-[#7f00ff] rounded-lg p-4 shadow-[0_0_10px_#00f0ff]">
-            <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] mb-2">
-              Chat
-            </h3>
-            <div className="h-64 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-[#00f0ff] mb-3 px-1">
+        {/* Chat and Participants Section */}
+        <div className="w-full lg:w-1/3 flex flex-col gap-4">
+          {/* Participants */}
+          <div className="bg-[#1a1a1a] rounded-xl p-4 shadow-lg max-h-60 overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-3">Participants</h3>
+            <ul className="space-y-1 max-h-48 overflow-y-auto">
+              {participants.map((p, i) => (
+                <li
+                  key={i}
+                  className="border-b border-[#333] py-1 text-sm truncate"
+                  title={p}
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Chat Box */}
+          <div className="bg-[#1a1a1a] rounded-xl p-4 shadow-lg flex flex-col h-96">
+            <h3 className="text-xl font-semibold mb-3">Chat</h3>
+            <div
+              className="flex-1 overflow-y-auto mb-2 px-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900"
+              style={{ scrollbarWidth: "thin" }}
+            >
               {messages.map((msg, i) => (
-                <div key={i} className="p-2 rounded-md bg-transparent">
-                  <strong className="text-[#00f0ff]">{msg.user}</strong>:{" "}
-                  {msg.text}
-                  <div className="text-xs text-gray-400">{msg.time}</div>
+                <div
+                  key={i}
+                  className={`mb-2 p-2 rounded-md ${
+                    msg.user === userName
+                      ? "bg-gradient-to-r from-purple-700 to-pink-700 text-white ml-auto max-w-[70%]"
+                      : "bg-[#222] text-gray-200 max-w-[70%]"
+                  }`}
+                  title={`${msg.user} @ ${msg.time}`}
+                >
+                  <strong>{msg.user}:</strong> {msg.text}
                 </div>
               ))}
             </div>
-            <div className="flex">
+
+            <div className="flex items-center space-x-2 relative">
+              <button
+                onClick={toggleEmojiPicker}
+                className="text-2xl px-2 hover:text-pink-500 transition"
+                aria-label="Toggle Emoji Picker"
+                title="Emoji picker"
+              >
+                😀
+              </button>
+
+              {showEmojiPicker && (
+                <div className="absolute bottom-12 left-0 bg-[#222] rounded-md p-2 shadow-lg grid grid-cols-5 gap-2 z-50">
+                  {emojis.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => addEmoji(emoji)}
+                      className="text-xl hover:bg-[#7f00ff] rounded-md transition"
+                      aria-label={`Add emoji ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <input
-                className="flex-grow p-2 bg-[#121212] border border-[#00f0ff] rounded-l-md text-white outline-none focus:outline-none focus:ring-0"
+                type="text"
+                placeholder="Type a message..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type something..."
-                style={{ resize: "none", minHeight: "38px" }}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="flex-grow rounded-full px-4 py-2 bg-[#222] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-600"
               />
               <button
-                className="bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] hover:from-[#00d0dd] hover:to-[#6a00cc] shadow-lg transition px-4 rounded-r-md font-semibold text-white"
                 onClick={handleSendMessage}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold hover:from-pink-500 hover:to-purple-500 transition"
               >
                 Send
               </button>
             </div>
-          </div>
-
-          {/* Participants */}
-          <div className="bg-[#1a1a1a] border border-[#00f0ff] rounded-lg p-4 shadow-[0_0_10px_#00f0ff]">
-            <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] to-[#7f00ff] mb-2">
-              Participants
-            </h3>
-            <ul className="space-y-3">
-              {participants.map((p, i) => (
-                <li key={i} className="flex items-center space-x-3">
-                  <img
-                    src={p.user.avatar || "/default_avatar.png"}
-                    alt="avatar"
-                    className="w-8 h-8 rounded-full border border-[#00f0ff]"
-                    onError={(e) => (e.target.src = "/default_avatar.png")}
-                  />
-                  <span className="font-semibold text-white">
-                    {p.user.username}
-                  </span>
-                  <span
-                    className={`text-sm ${
-                      p.status === "host" ? "text-yellow-400" : "text-[#00f0ff]"
-                    }`}
-                  >
-                    ({p.status === "host" ? "Host" : "Guest"})
-                  </span>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </div>
