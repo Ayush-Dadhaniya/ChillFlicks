@@ -227,7 +227,7 @@ const Lobby = () => {
                   <p key={participant.user._id}>{participant.user.username}</p>
                 </span>
                 {participant.status && (
-                  <p key={participant.user._id}>{participant.user.status}</p>
+                  <p key={participant.user._id}>{participant.status}</p>
                 )}
               </div>
             ))}
