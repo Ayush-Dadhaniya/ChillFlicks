@@ -222,7 +222,7 @@ const Lobby = () => {
               <div className="flex items-center space-x-2 mb-1">
                 <span
                   className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
+                  style={{ backgroundColor: participants.status === "host" ? "#FFD700" : "#32CD32" }}
                 ></span>
                 <span className="text-[#7dd3fc]">
                   <p key={participant.user._id}>{participant.user.username}</p>
