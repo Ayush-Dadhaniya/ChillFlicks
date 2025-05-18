@@ -1,202 +1,106 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-import io from "socket.io-client";
+import React, { useEffect, useRef, useState } from "react";
 
-const API_URL = "http://localhost:3000";
-const socket = io(API_URL);
+const emojiList = ["😀", "😂", "😍", "😢", "👍", "🎉", "💯", "🔥", "🙏", "😎"];
 
-// Simple emoji list for picker
-const emojiList = [
-  "😀", "😂", "😍", "😎", "😭", "👍", "🎉", "❤️", "🔥", "🥳", "🤔", "🙌"
-];
-
-const Lobby = () => {
-  const { roomCode } = useParams();
-  const playerRef = useRef(null);
-  const playerContainerRef = useRef(null);
-
+const Lobby = ({ roomCode, userName, socket }) => {
   const [messages, setMessages] = useState([]);
-  const [participants, setParticipants] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [userName, setUserName] = useState("");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [volume, setVolume] = useState(100);
-  const [isMuted, setIsMuted] = useState(false);
+  const [participants, setParticipants] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  const extractYouTubeId = (url) => {
-    const regExp =
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
-    const match = url.match(regExp);
-    return match ? match[1] : null;
-  };
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [volume, setVolume] = useState(50);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const playerRef = useRef(null);
+  const playerContainerRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  // Scroll chat to bottom when messages change
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      const decoded = JSON.parse(atob(token.split(".")[1]));
-      const name = decoded.username || decoded.name || "Guest";
-      setUserName(name);
-
-      axios
-        .get(`${API_URL}/rooms/${roomCode}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => {
-          setVideoUrl(res.data.videoUrl);
-          setIsPlaying(res.data.isPlaying);
-          setParticipants(res.data.participants || []);
-        });
-    } catch (err) {
-      console.error("Invalid token:", err);
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [roomCode]);
+  }, [messages]);
 
+  // Socket event listeners
   useEffect(() => {
-    if (!userName) return;
+    if (!socket) return;
 
     socket.emit("joinRoom", { roomId: roomCode, user: userName });
-
-    socket.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);
-    });
 
     socket.on("messageHistory", (history) => {
       setMessages(history);
     });
 
-    socket.on("participantJoined", (updatedParticipants) => {
-      setParticipants(updatedParticipants);
+    socket.on("newMessage", (msg) => {
+      setMessages((prev) => [...prev, msg]);
     });
 
-    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
-      setIsPlaying(isPlaying);
+    socket.on("participantJoined", (list) => {
+      setParticipants(list);
+    });
 
-      const trySyncPlayback = () => {
-        if (playerRef.current && playerReady) {
-          const state = playerRef.current.getPlayerState();
-          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
-
-          if (diff > 1) playerRef.current.seekTo(currentTime, true);
-          if (isPlaying && state !== 1) playerRef.current.playVideo();
-          if (!isPlaying && state === 1) playerRef.current.pauseVideo();
-        } else {
-          setTimeout(trySyncPlayback, 500);
-        }
-      };
-
-      trySyncPlayback();
+    socket.on("videoStateChanged", ({ playing, currentTime }) => {
+      if (!playerRef.current) return;
+      if (playing && !isPlaying) {
+        playerRef.current.playVideo();
+      } else if (!playing && isPlaying) {
+        playerRef.current.pauseVideo();
+      }
+      const playerTime = playerRef.current.getCurrentTime();
+      if (Math.abs(playerTime - currentTime) > 1) {
+        playerRef.current.seekTo(currentTime, true);
+      }
+      setIsPlaying(playing);
     });
 
     return () => {
-      socket.off("newMessage");
       socket.off("messageHistory");
+      socket.off("newMessage");
       socket.off("participantJoined");
       socket.off("videoStateChanged");
     };
-  }, [userName, roomCode, playerReady]);
+  }, [socket, roomCode, userName, isPlaying]);
 
   const handleSendMessage = () => {
-    if (newMessage.trim()) {
+    const trimmed = newMessage.trim();
+    if (trimmed && socket) {
       const msg = {
         user: userName,
-        text: newMessage,
+        text: trimmed,
         time: new Date().toLocaleTimeString(),
       };
-      socket.emit("sendMessage", { roomId: roomCode, message: msg });
+      socket.emit("sendMessage", msg);
       setNewMessage("");
       setShowEmojiPicker(false);
     }
   };
 
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker((show) => !show);
+  };
+
+  const addEmoji = (emoji) => {
+    setNewMessage((msg) => msg + emoji);
+  };
+
+  // YouTube Player related
+
+  // Play/pause toggle
   const handlePlayPause = () => {
-    if (!playerReady || !playerRef.current) return;
-
-    const newPlayState = !isPlaying;
-    const currentTime = playerRef.current.getCurrentTime();
-
-    setIsPlaying(newPlayState);
-    socket.emit("updateVideoState", {
-      roomId: roomCode,
-      isPlaying: newPlayState,
-      currentTime,
-    });
-  };
-
-  // Fullscreen toggle for video container
-  const toggleFullscreen = () => {
-    if (!playerContainerRef.current) return;
-
-    if (!isFullscreen) {
-      if (playerContainerRef.current.requestFullscreen) {
-        playerContainerRef.current.requestFullscreen();
-      } else if (playerContainerRef.current.mozRequestFullScreen) {
-        playerContainerRef.current.mozRequestFullScreen();
-      } else if (playerContainerRef.current.webkitRequestFullscreen) {
-        playerContainerRef.current.webkitRequestFullscreen();
-      } else if (playerContainerRef.current.msRequestFullscreen) {
-        playerContainerRef.current.msRequestFullscreen();
-      }
-      setIsFullscreen(true);
+    if (!playerRef.current) return;
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+      socket.emit("updateVideoState", { playing: false, currentTime: playerRef.current.getCurrentTime() });
+      setIsPlaying(false);
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        document.mozCancelFullScreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
-      setIsFullscreen(false);
-    }
-  };
-
-  // Detect fullscreen change so we can update state even if user exits fullscreen manually
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const fullscreenElement =
-        document.fullscreenElement ||
-        document.mozFullScreenElement ||
-        document.webkitFullscreenElement ||
-        document.msFullscreenElement;
-
-      setIsFullscreen(!!fullscreenElement);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
-    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        handleFullscreenChange
-      );
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
-    };
-  }, []);
-
-  // Volume change handler
-  const handleVolumeChange = (e) => {
-    const vol = Number(e.target.value);
-    setVolume(vol);
-    if (playerRef.current) {
-      playerRef.current.setVolume(vol);
-      if (vol === 0) {
-        setIsMuted(true);
-      } else {
-        setIsMuted(false);
-      }
+      playerRef.current.playVideo();
+      socket.emit("updateVideoState", { playing: true, currentTime: playerRef.current.getCurrentTime() });
+      setIsPlaying(true);
     }
   };
 
@@ -214,193 +118,235 @@ const Lobby = () => {
     }
   };
 
-  // Emoji picker toggle
-  const toggleEmojiPicker = () => {
-    setShowEmojiPicker((v) => !v);
+  // Volume slider
+  const handleVolumeChange = (e) => {
+    const vol = parseInt(e.target.value, 10);
+    if (!playerRef.current) return;
+    playerRef.current.setVolume(vol);
+    setVolume(vol);
+    setIsMuted(vol === 0);
   };
 
-  // Add emoji to input
-  const addEmoji = (emoji) => {
-    setNewMessage((prev) => prev + emoji);
-    setShowEmojiPicker(false);
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    if (!playerContainerRef.current) return;
+    if (!isFullscreen) {
+      if (playerContainerRef.current.requestFullscreen) {
+        playerContainerRef.current.requestFullscreen();
+      } else if (playerContainerRef.current.webkitRequestFullscreen) {
+        playerContainerRef.current.webkitRequestFullscreen();
+      } else if (playerContainerRef.current.mozRequestFullScreen) {
+        playerContainerRef.current.mozRequestFullScreen();
+      } else if (playerContainerRef.current.msRequestFullscreen) {
+        playerContainerRef.current.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+      setIsFullscreen(false);
+    }
   };
 
+  // Load YouTube Player API and setup player
   useEffect(() => {
-    if (!videoUrl) return;
-    const videoId = extractYouTubeId(videoUrl);
-    if (!videoId) return;
-
     const loadPlayer = () => {
-      if (playerRef.current) return;
-
-      const player = new window.YT.Player("youtube-player", {
-        videoId,
-        playerVars: {
-          modestbranding: 0,
-          rel: 0,
-          controls: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          disablekb: 1,
-          autoplay: 0,
-          playsinline: 1,
-          showinfo: 0,
-        },
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      playerRef.current = new window.YT.Player("youtube-player", {
+        videoId: extractVideoId(videoUrl),
         events: {
-          onReady: (event) => {
-            playerRef.current = event.target;
+          onReady: () => {
             setPlayerReady(true);
             playerRef.current.setVolume(volume);
+            if (isMuted) playerRef.current.mute();
+          },
+          onStateChange: (event) => {
+            const state = event.data;
+            // 1=playing, 2=paused
+            if (state === 1 && !isPlaying) setIsPlaying(true);
+            else if (state === 2 && isPlaying) setIsPlaying(false);
           },
         },
       });
     };
 
-    if (window.YT && window.YT.Player) {
-      loadPlayer();
+    // Extract video ID helper
+    const extractVideoId = (url) => {
+      const match = url.match(/[?&]v=([^&]+)/);
+      return match ? match[1] : url;
+    };
+
+    // Load YouTube IFrame API if not loaded
+    if (!window.YT) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.body.appendChild(tag);
+
+      window.onYouTubeIframeAPIReady = () => {
+        loadPlayer();
+      };
     } else {
-      const existingScript = document.querySelector(
-        "script[src='https://www.youtube.com/iframe_api']"
-      );
-      if (!existingScript) {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
-      }
-      window.onYouTubeIframeAPIReady = loadPlayer;
+      loadPlayer();
     }
-  }, [videoUrl]);
+
+    // Cleanup on unmount
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [videoUrl, volume, isMuted]);
 
   return (
-    <div className="bg-[#0f0f0f] text-white min-h-screen p-6 font-sans">
-      <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] mb-6 text-center">
-        Room Code: {roomCode}
-      </h2>
-
-      <div className="flex flex-col lg:flex-row gap-6 justify-center items-start">
-        {/* Video Section */}
+    <div className="lobby-container" style={{ maxWidth: 900, margin: "auto" }}>
+      <h2>Room: {roomCode}</h2>
+      <div
+        ref={playerContainerRef}
+        className="player-wrapper"
+        style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}
+      >
         <div
-          className={`w-full lg:w-2/3 transition-transform duration-300`}
-          ref={playerContainerRef}
-          style={{ position: "relative" }}
+          id="youtube-player"
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
         >
-          <div
-            id="youtube-player"
-            className="aspect-video w-full rounded-xl shadow-cyan-200"
-          />
-          {/* Custom Controls */}
-          <div className="flex items-center mt-4 space-x-4">
-            <button
-              onClick={handlePlayPause}
-              className="px-6 py-2 text-white font-semibold rounded-full bg-gradient-to-r from-[#ff00ff] to-[#7f00ff] hover:from-[#00d0dd] hover:to-[#6a00cc] shadow-lg transition"
-            >
-              {isPlaying ? "Pause Video" : "Play Video"}
-            </button>
-
-            <button
-              onClick={toggleFullscreen}
-              className="px-4 py-2 rounded-md border border-purple-500 hover:bg-purple-600 transition"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? "Minimize" : "Fullscreen"}
-            </button>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={toggleMute}
-                className="text-xl"
-                aria-label={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? "🔇" : "🔊"}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={handleVolumeChange}
-                className="w-32"
-              />
-            </div>
-          </div>
+          {!playerReady && <p>Loading video player...</p>}
         </div>
+      </div>
 
+      <div style={{ marginTop: 10 }}>
+        <button onClick={handlePlayPause}>
+          {isPlaying ? "Pause" : "Play"}
+        </button>
+        <button onClick={toggleFullscreen}>
+          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        </button>
+        <button onClick={toggleMute}>{isMuted ? "Unmute" : "Mute"}</button>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={volume}
+          onChange={handleVolumeChange}
+          style={{ verticalAlign: "middle", marginLeft: 10 }}
+        />
+      </div>
+
+      <div style={{ marginTop: 20, display: "flex" }}>
         {/* Chat Section */}
-        <div className="w-full lg:w-1/3 flex flex-col h-[600px] bg-[#181818] rounded-xl shadow-lg p-4 overflow-hidden">
-          <div className="flex-1 overflow-y-auto mb-4 px-2">
-            {messages.length === 0 && (
-              <p className="text-gray-400 text-center mt-4">No messages yet</p>
-            )}
+        <div
+          className="chat-section"
+          style={{
+            flex: 1,
+            border: "1px solid #ccc",
+            padding: 10,
+            maxHeight: 400,
+            overflowY: "auto",
+            marginRight: 10,
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+          }}
+        >
+          <div style={{ flexGrow: 1, overflowY: "auto" }}>
             {messages.map((msg, i) => (
               <div
                 key={i}
-                className={`mb-2 p-2 rounded-md ${msg.user === userName
-                    ? "bg-purple-600 text-white self-end max-w-[75%]"
-                    : "bg-gray-700 text-white max-w-[75%]"
-                  }`}
+                style={{
+                  marginBottom: 8,
+                  backgroundColor: msg.user === userName ? "#dcf8c6" : "#fff",
+                  padding: "5px 8px",
+                  borderRadius: 5,
+                  alignSelf: msg.user === userName ? "flex-end" : "flex-start",
+                  maxWidth: "80%",
+                  wordWrap: "break-word",
+                }}
               >
-                <div className="text-sm font-semibold">{msg.user}</div>
-                <div>{msg.text}</div>
-                <div className="text-xs text-gray-300 text-right">{msg.time}</div>
+                <strong>{msg.user}</strong> [{msg.time}]: {msg.text}
               </div>
             ))}
+            <div ref={chatEndRef} />
           </div>
 
-          <div className="flex items-center space-x-2 relative">
-            <button
-              onClick={toggleEmojiPicker}
-              className="text-2xl hover:text-purple-400 transition"
-              title="Emoji picker"
-            >
-              😊
-            </button>
-
-            {showEmojiPicker && (
-              <div className="absolute bottom-12 left-0 bg-[#222222] border border-purple-500 rounded-md p-2 grid grid-cols-6 gap-2 shadow-lg z-50">
-                {emojiList.map((emoji, i) => (
-                  <button
-                    key={i}
-                    className="text-xl hover:bg-purple-700 rounded-md p-1 transition"
-                    onClick={() => addEmoji(emoji)}
-                    aria-label={`Add emoji ${emoji}`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center" }}>
             <input
               type="text"
-              placeholder="Type your message..."
+              placeholder="Type a message"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSendMessage();
               }}
-              className="flex-grow bg-[#333333] rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              style={{ flexGrow: 1, padding: 6, fontSize: 14 }}
             />
-            <button
-              onClick={handleSendMessage}
-              className="bg-purple-700 px-4 py-2 rounded-md hover:bg-purple-900 transition"
-            >
+            <button onClick={toggleEmojiPicker} style={{ marginLeft: 5 }}>
+              😊
+            </button>
+            <button onClick={handleSendMessage} style={{ marginLeft: 5 }}>
               Send
             </button>
           </div>
 
-          {/* Participants */}
-          <div className="mt-4 border-t border-purple-600 pt-2 text-sm text-gray-400">
-            <h4 className="font-semibold mb-1">Participants ({participants.length})</h4>
-            <div className="flex flex-wrap gap-2">
-              {participants.map((p, i) => (
-                <span
-                  key={i}
-                  className="bg-purple-700 rounded-full px-3 py-1 text-white"
+          {showEmojiPicker && (
+            <div
+              style={{
+                border: "1px solid #ccc",
+                padding: 5,
+                marginTop: 5,
+                background: "#fff",
+                position: "absolute",
+                zIndex: 1000,
+                maxWidth: 200,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                bottom: "40px",
+                right: "10px",
+              }}
+            >
+              {emojiList.map((emoji, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => addEmoji(emoji)}
+                  style={{ fontSize: 20, cursor: "pointer", border: "none", background: "none" }}
+                  aria-label={`Add emoji ${emoji}`}
                 >
-                  {p}
-                </span>
+                  {emoji}
+                </button>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* Participants Section */}
+        <div
+          className="participants-section"
+          style={{
+            width: 180,
+            border: "1px solid #ccc",
+            padding: 10,
+            maxHeight: 400,
+            overflowY: "auto",
+          }}
+        >
+          <h4>Participants ({participants.length})</h4>
+          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
+            {participants.map((p, idx) => (
+              <li key={idx} style={{ padding: "4px 0", borderBottom: "1px solid #eee" }}>
+                {p.user.username}{p.status}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>
