@@ -64,7 +64,7 @@ const Room = () => {
       return;
     }
 
-    const response = await fetch('http://localhost:3000/rooms/create', {
+    const response = await fetch('https://chillflicks.up.railway.app/rooms/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ host, videoUrl: convertToEmbedUrl(videoUrl) }),

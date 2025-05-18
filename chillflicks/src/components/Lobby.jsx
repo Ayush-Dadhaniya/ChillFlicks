@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://chillflicks.up.railway.app";
 const socket = io(API_URL);
 
 const Lobby = () => {

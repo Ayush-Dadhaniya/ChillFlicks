@@ -16,7 +16,7 @@ const Profile = () => {
 
     const fetchUserData = async () => {
       try {
-        const res = await fetch('http://localhost:3000/profile', {
+        const res = await fetch('https://chillflicks.up.railway.app/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -26,7 +26,7 @@ const Profile = () => {
         setUser(data);
 
         const avatarPath = data.avatar ? data.avatar : '/uploads/avatars/default-avatar.png';
-        setAvatarPreview(`http://localhost:3000${avatarPath}`);
+        setAvatarPreview(`https://chillflicks.up.railway.app${avatarPath}`);
       } catch (err) {
         console.error(err);
       }
@@ -54,7 +54,7 @@ const Profile = () => {
     formData.append('avatar', avatar);
 
     try {
-      const res = await fetch('http://localhost:3000/profile/update-avatar', {
+      const res = await fetch('https://chillflicks.up.railway.app/profile/update-avatar', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -65,7 +65,7 @@ const Profile = () => {
       const data = await res.json();
       if (data.success) {
         alert('Profile updated successfully');
-        setAvatarPreview(`http://localhost:3000${data.avatar}`);
+        setAvatarPreview(`https://chillflicks.up.railway.app${data.avatar}`);
         setAvatar(null); // clear selected file
       } else {
         alert('Avatar update failed');
@@ -87,7 +87,7 @@ const Profile = () => {
             alt="Avatar"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = 'http://localhost:3000/uploads/avatars/default_avatar.png';
+              e.target.src = 'https://chillflicks.up.railway.app/uploads/avatars/default_avatar.png';
             }}
             className="w-32 h-32 rounded-full object-cover border-4 border-purple-500 shadow-md"
           />

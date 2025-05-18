@@ -11,7 +11,7 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try{
-      const res = await fetch('http://localhost:3000/auth/signup',{
+      const res = await fetch('https://chillflicks.up.railway.app/auth/signup',{
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
