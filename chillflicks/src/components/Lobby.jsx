@@ -45,8 +45,7 @@ const Lobby = () => {
           setParticipants(participants || []);
           const id = extractYouTubeId(videoUrl);
           if (id) setVideoId(id);
-          console.log("Fetched videoUrl:", videoUrl);
-          console.log("Extracted videoId:", extractYouTubeId(videoUrl));
+          console.log("Fetched part:", participants);
         });
     } catch (err) {
       console.error("Invalid token:", err);
