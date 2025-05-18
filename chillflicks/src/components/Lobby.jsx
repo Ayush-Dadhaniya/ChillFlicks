@@ -41,6 +41,7 @@ const Lobby = () => {
           setVideoUrl(res.data.videoUrl);
           setIsPlaying(res.data.isPlaying);
           setParticipants(res.data.participants || []);
+          console.log("Participants:", res.data.participants);
         });
     } catch (err) {
       console.error("Invalid token:", err);
@@ -236,7 +237,7 @@ const Lobby = () => {
                   style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
                 ></span>
                 <span className="text-[#7dd3fc]">
-                  {part.user || part.name || part.username || part._id || "Unnamed"}
+                  {part.user.username || part.name || part.username || part._id || "Unnamed"}
                 </span>
                 {part.status && (
                   <span className="text-xs text-gray-400">({part.status})</span>
