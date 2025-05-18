@@ -3,12 +3,12 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 
-const API_URL = "https://chillflicks.up.railway.app";
+const API_URL = "http://localhost:3000";
+const socket = io(API_URL);
 
 const Lobby = () => {
   const { roomCode } = useParams();
   const playerRef = useRef(null);
-  const socketRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
   const [participants, setParticipants] = useState([]);
@@ -17,10 +17,9 @@ const Lobby = () => {
   const [userName, setUserName] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
-  const [videoId, setVideoId] = useState("");
 
   const extractYouTubeId = (url) => {
-    const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+    const regExp = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
     const match = url.match(regExp);
     return match ? match[1] : null;
   };
@@ -39,12 +38,9 @@ const Lobby = () => {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => {
-          const { videoUrl, isPlaying, participants } = res.data;
-          setVideoUrl(videoUrl);
-          setIsPlaying(isPlaying);
-          setParticipants(participants || []);
-          const id = extractYouTubeId(videoUrl);
-          if (id) setVideoId(id);
+          setVideoUrl(res.data.videoUrl);
+          setIsPlaying(res.data.isPlaying);
+          setParticipants(res.data.participants || []);
         });
     } catch (err) {
       console.error("Invalid token:", err);
@@ -52,86 +48,84 @@ const Lobby = () => {
   }, [roomCode]);
 
   useEffect(() => {
-    if (!userName || !roomCode) return;
+    if (!userName) return;
 
-    socketRef.current = io(API_URL);
+    socket.emit("joinRoom", { roomId: roomCode, user: userName });
 
-    socketRef.current.emit("joinRoom", { roomId: roomCode, user: userName });
+    socket.on("newMessage", (msg) => {
+      setMessages((prev) => [...prev, msg]);  // Update only for incoming messages
+    });
 
-    socketRef.current.on("newMessage", (msg) =>
-      setMessages((prev) => [...prev, msg])
-    );
-    socketRef.current.on("messageHistory", (history) =>
-      setMessages(history)
-    );
-    socketRef.current.on("participantJoined", (updated) =>
-      setParticipants(updated)
-    );
-    socketRef.current.on("videoStateChanged", ({ isPlaying, currentTime }) => {
+    socket.on("messageHistory", (history) => {
+      setMessages(history);
+    });
+
+    socket.on("participantJoined", (updatedParticipants) => {
+      setParticipants(updatedParticipants);
+    });
+
+    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
       setIsPlaying(isPlaying);
 
-      const syncPlayback = () => {
+      const trySyncPlayback = () => {
         if (playerRef.current && playerReady) {
-          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
           const state = playerRef.current.getPlayerState();
+          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
 
           if (diff > 1) playerRef.current.seekTo(currentTime, true);
           if (isPlaying && state !== 1) playerRef.current.playVideo();
           if (!isPlaying && state === 1) playerRef.current.pauseVideo();
         } else {
-          setTimeout(syncPlayback, 500);
+          setTimeout(trySyncPlayback, 500);
         }
       };
 
-      syncPlayback();
+      trySyncPlayback();
     });
 
     return () => {
-      socketRef.current.disconnect();
+      socket.off("newMessage");
+      socket.off("messageHistory");
+      socket.off("participantJoined");
+      socket.off("videoStateChanged");
     };
   }, [userName, roomCode, playerReady]);
 
   const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-    const msg = {
-      user: userName,
-      text: newMessage,
-      time: new Date().toLocaleTimeString(),
-    };
-    socketRef.current.emit("sendMessage", { roomId: roomCode, message: msg });
-    setNewMessage("");
+    if (newMessage.trim()) {
+      const msg = {
+        user: userName,
+        text: newMessage,
+        time: new Date().toLocaleTimeString(),
+      };
+      socket.emit("sendMessage", { roomId: roomCode, message: msg });
+      setNewMessage("");  // Clear the input after sending the message
+    }
   };
 
   const handlePlayPause = () => {
-    if (!playerRef.current || !playerReady) return;
-    const newState = !isPlaying;
+    if (!playerReady || !playerRef.current) return;
+
+    const newPlayState = !isPlaying;
     const currentTime = playerRef.current.getCurrentTime();
-    setIsPlaying(newState);
-    socketRef.current.emit("updateVideoState", {
+
+    setIsPlaying(newPlayState);
+    socket.emit("updateVideoState", {
       roomId: roomCode,
-      isPlaying: newState,
+      isPlaying: newPlayState,
       currentTime,
     });
   };
 
   useEffect(() => {
+    if (!videoUrl) return;
+    const videoId = extractYouTubeId(videoUrl);
     if (!videoId) return;
 
-    const loadYouTubeAPI = () => {
-      if (window.YT && window.YT.Player) {
-        createPlayer();
-      } else {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(script);
-        window.onYouTubeIframeAPIReady = createPlayer;
-      }
-    };
-
-    const createPlayer = () => {
+    const loadPlayer = () => {
       if (playerRef.current) return;
 
-      playerRef.current = new window.YT.Player("youtube-player", {
+      const player = new window.YT.Player("youtube-player", {
         videoId,
         playerVars: {
           modestbranding: 1,
@@ -142,15 +136,29 @@ const Lobby = () => {
           disablekb: 1,
           autoplay: 0,
           playsinline: 1,
+          showinfo: 0,
         },
         events: {
-          onReady: () => setPlayerReady(true),
+          onReady: (event) => {
+            playerRef.current = event.target;
+            setPlayerReady(true);
+          },
         },
       });
     };
 
-    loadYouTubeAPI();
-  }, [videoId]);
+    if (window.YT && window.YT.Player) {
+      loadPlayer();
+    } else {
+      const existingScript = document.querySelector("script[src='https://www.youtube.com/iframe_api']");
+      if (!existingScript) {
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(tag);
+      }
+      window.onYouTubeIframeAPIReady = loadPlayer;
+    }
+  }, [videoUrl]);
 
   return (
     <div className="bg-black text-white min-h-screen p-4 flex flex-col items-center">
@@ -163,7 +171,7 @@ const Lobby = () => {
       <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-4">
         <div className="bg-[#121212] flex-1 rounded-xl shadow-xl border border-[#00FF88] p-4 flex flex-col items-center">
           <div className="w-full aspect-video bg-black border border-[#00FF88] rounded-lg relative flex items-center justify-center">
-            {videoId ? (
+            {videoUrl ? (
               <>
                 <div className="w-full h-full" id="youtube-player"></div>
                 <button
@@ -186,9 +194,7 @@ const Lobby = () => {
 
         <div className="flex flex-col lg:w-96 gap-4">
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#D946EF] flex flex-col h-[400px]">
-            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">
-              💬 VIBE CHAT
-            </div>
+            <div className="bg-[#D946EF] text-black text-sm font-bold px-4 py-2 rounded-t-xl">💬 VIBE CHAT</div>
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 text-sm">
               {messages.map((msg, i) => (
                 <div key={i} className="flex flex-col">
@@ -220,24 +226,23 @@ const Lobby = () => {
             </div>
           </div>
 
+          {/* 👥 Participants */}
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-            {participants.map((participant, index) => {
-              const username =
-                participant?.user?.username ||
-                participant?.user?.name ||
-                participant?.username ||
-                participant?.name ||
-                participant?.user?._id ||
-                "Unknown";
-              const isHost = participant?.status === "host";
-              return (
-                <div key={participant._id || index} className="flex items-center space-x-2 mb-1">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isHost ? "#FFD700" : "#00FF88" }} />
-                  <span>{username} {isHost && "(Host)"}</span>
-                </div>
-              );
-            })}
+            {participants.map((part, i) => (
+              <div key={i} className="flex items-center space-x-2 mb-1">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
+                ></span>
+                <span className="text-[#7dd3fc]">
+                  {part.user || part.name || part.username || part._id || "Unnamed"}
+                </span>
+                {part.status && (
+                  <span className="text-xs text-gray-400">({part.status})</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
