@@ -198,9 +198,17 @@ const Lobby = () => {
           <h3 className="text-lg font-semibold mb-2">Participants</h3>
           <ul>
             {participants.map((p, i) => (
-              <li key={i} className="mb-1">
-                <span>{p.user.username}</span>
-                {p.status === 'host' && <span className="ml-2 text-yellow-400 text-sm">(Host)</span>}
+              <li key={i} className="flex items-center space-x-2 mb-2" title={p.status}>
+                <img
+                  src={p.user.avatar || "/default-avatar.png"}
+                  alt={`${p.user.username}'s avatar`}
+                  className="w-8 h-8 rounded-full border border-gray-500"
+                  onError={(e) => (e.target.src = "/default-avatar.png")}
+                />
+                <span className="font-medium">{p.user.username}</span>
+                <span className={`text-sm ${p.status === "host" ? "text-yellow-400" : "text-blue-400"}`}>
+                  ({p.status === "host" ? "Host" : "Guest"})
+                </span>
               </li>
             ))}
           </ul>
