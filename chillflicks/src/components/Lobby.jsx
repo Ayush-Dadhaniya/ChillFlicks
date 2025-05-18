@@ -39,13 +39,12 @@ const Lobby = () => {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => {
-          const {videoUrl, isPlaying, participants } = res.data;
+          const { videoUrl, isPlaying, participants } = res.data;
           setVideoUrl(videoUrl);
           setIsPlaying(isPlaying);
           setParticipants(participants || []);
           const id = extractYouTubeId(videoUrl);
           if (id) setVideoId(id);
-          console.log("Fetched part:", participants);
         });
     } catch (err) {
       console.error("Invalid token:", err);
@@ -217,22 +216,24 @@ const Lobby = () => {
 
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border-t-4 border-[#00FF88] p-4">
             <h3 className="text-[#00FF88] font-bold mb-2">👥 Participants</h3>
-              {participants.map((participant, index) => (
+            {participants.map((participant, index) => {
+              const username =
+                participant?.user?.username ||
+                participant?.user?.name ||
+                participant?.username ||
+                participant?.name ||
+                "Unknown";
+              return (
                 <div key={participant._id || index} className="flex items-center space-x-2 mb-1">
                   <span
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: participant.status === "host" ? "#FFD700" : "#32CD32" }}
                   ></span>
-
-                  <span className="text-[#7dd3fc]">
-                    {participant.user?.username || "Unknown"}
-                  </span>
-
-                  <span className="text-sm text-gray-400">
-                    ({participant.status})
-                  </span>
+                  <span className="text-[#7dd3fc]">{username}</span>
+                  <span className="text-sm text-gray-400">({participant.status})</span>
                 </div>
-              ))}
+              );
+            })}
           </div>
         </div>
       </div>

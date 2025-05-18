@@ -62,7 +62,7 @@ const generateRoomCode = () => {
 export const getRoomDetails = async (req, res) => {
   try {
     const room = await Room.findOne({ roomCode: req.params.roomCode })
-      .populate('participants.user', 'username name')
+      .populate('participants.user', 'username')
       .exec();
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
