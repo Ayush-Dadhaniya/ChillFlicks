@@ -237,7 +237,7 @@ const Lobby = () => {
                   style={{ backgroundColor: part.status === "host" ? "#FFD700" : "#32CD32" }}
                 ></span>
                 <span className="text-[#7dd3fc]">
-                  {part.user.username || part.name || part.username || part._id || "Unnamed"}
+                  {part.user?.username || part.user?.name || part.user?._id || "Unnamed"}
                 </span>
                 {part.status && (
                   <span className="text-xs text-gray-400">({part.status})</span>
