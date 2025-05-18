@@ -200,10 +200,10 @@ const Lobby = () => {
             {participants.map((p, i) => (
               <li key={i} className="flex items-center space-x-2 mb-2" title={p.status}>
                 <img
-                  src={p.user.avatar || "/default-avatar.png"}
+                  src={p.user.avatar || "/default_avatar.png"}
                   alt={`${p.user.username}'s avatar`}
                   className="w-8 h-8 rounded-full border border-gray-500"
-                  onError={(e) => (e.target.src = "/default-avatar.png")}
+                  onError={(e) => (e.target.src = "/default_avatar.png")}
                 />
                 <span className="font-medium">{p.user.username}</span>
                 <span className={`text-sm ${p.status === "host" ? "text-yellow-400" : "text-blue-400"}`}>
