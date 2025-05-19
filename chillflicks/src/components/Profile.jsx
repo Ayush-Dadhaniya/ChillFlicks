@@ -84,7 +84,7 @@ const Profile = () => {
         <div className="relative">
           <img
             src={avatarPreview}
-            alt="Avatar"
+            alt=""
             onError={(e) => {
               e.target.onerror = null;
               e.target.src = 'https://chillflicks.up.railway.app/uploads/avatars/default_avatar.png';
