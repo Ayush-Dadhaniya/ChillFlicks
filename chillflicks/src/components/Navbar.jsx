@@ -123,10 +123,10 @@ const Navbar = () => {
 
       {/* Profile Sidebar Drawer */}
       {showProfile && (
-        <div className="fixed top-0 right-0 w-80 h-full bg-white text-black shadow-lg z-50 p-4 overflow-y-auto">
+        <div className="fixed top-5 right-0 text-black shadow-lg z-50 p-4 overflow-y-auto">
           <button
             onClick={() => setShowProfile(false)}
-            className="text-gray-700 font-bold text-lg absolute top-2 right-4"
+            className="text-gray-700 font-bold text-lg absolute top-17 right-7"
           >
             ✕
           </button>
