@@ -60,7 +60,7 @@ app.get('/profile', authenticateUser, (req, res) => {
   res.json(req.user);
 });
 
-app.post('/profile/update-avatar', upload.single('avatar'), async (req, res) => {
+app.post('/profile/update-avatar', authenticateUser, upload.single('avatar'), async (req, res) => {
   try {
     req.user.avatar = `/uploads/avatars/${req.file.filename}`;
     await req.user.save();
