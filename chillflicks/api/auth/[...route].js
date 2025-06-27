@@ -19,9 +19,7 @@ export default async function handler(req, res) {
   const { route } = req.query;
   const routeArr = Array.isArray(route) ? route : [route];
   const [action] = routeArr;
-
-  // Debug log
-  console.log('AUTH API:', { route, method: req.method, body: req.body });
+  console.log('DEBUG ROUTE:', { route, routeArr, action, method: req.method, body: req.body });
 
   try {
     switch (action) {
