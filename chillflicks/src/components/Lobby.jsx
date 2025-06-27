@@ -507,13 +507,15 @@ const Lobby = () => {
                     messages.map((msg, i) => (
                       <div
                         key={i}
-                        className={`p-3 mb-2 max-w-[85%] ${msg.user === userName ? "bg-pink-600/30 text-white self-end rounded-t-lg rounded-l-lg" : "bg-gray-700 text-white self-start rounded-t-lg rounded-r-lg"}`}
+                        className={`p-3 mb-2 max-w-[85%] ${msg.user?.username === userName ? "bg-pink-600/30 text-white self-end rounded-t-lg rounded-l-lg" : "bg-gray-700 text-white self-start rounded-t-lg rounded-r-lg"}`}
                       >
-                        <div className={`font-bold text-sm ${msg.user === userName ? "text-cyan-300" : "text-pink-400"}`}>
-                          {msg.user === userName ? "You" : msg.user}
+                        <div className={`font-bold text-sm ${msg.user?.username === userName ? "text-cyan-300" : "text-pink-400"}`}>
+                          {msg.user?.username === userName ? "You" : msg.user?.username}
                         </div>
-                        <div className="break-words mt-1">{msg.text}</div>
-                        <div className="text-xs text-gray-400 mt-1 text-right">{msg.time}</div>
+                        <div className="break-words mt-1">{msg.content}</div>
+                        <div className="text-xs text-gray-400 mt-1 text-right">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </div>
                       </div>
                     ))
                   ) : (

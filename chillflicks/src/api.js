@@ -35,27 +35,33 @@ api.interceptors.request.use((config) => {
 
 // Auth API
 export const authAPI = {
-  signup: (userData) => api.post('/auth/signup', userData),
   login: (credentials) => api.post('/auth/login', credentials),
+  signup: (userData) => api.post('/auth/signup', userData),
 };
 
-// Rooms API
+// Rooms API - Updated to use consolidated endpoint
 export const roomsAPI = {
-  create: (roomData) => api.post('/rooms/create', roomData),
-  join: (roomCode) => api.post('/rooms/join', { roomCode }),
-  get: (roomCode) => api.get(`/rooms/get?roomCode=${roomCode}`),
-  update: (roomData) => api.put('/rooms/update', roomData),
+  create: (roomData) => api.post('/rooms', { ...roomData, action: 'create' }),
+  join: (roomCode) => api.post('/rooms', { roomCode, action: 'join' }),
+  get: (roomCode) => api.get(`/rooms?roomCode=${roomCode}`),
+  update: (roomData) => api.put('/rooms', roomData),
 };
 
-// Messages API
+// Messages API - Updated to use consolidated endpoint
 export const messagesAPI = {
-  send: (messageData) => api.post('/messages/send', messageData),
-  get: (roomId) => api.get(`/messages/get?roomId=${roomId}`),
+  send: (messageData) => api.post('/messages', messageData),
+  get: (roomId) => api.get(`/messages?roomId=${roomId}`),
 };
 
-// Profile API
+// Profile API - Updated to use consolidated endpoint
 export const profileAPI = {
   get: () => api.get('/profile'),
+  update: (profileData) => api.put('/profile', profileData),
+};
+
+// Pusher API
+export const pusherAPI = {
+  auth: (authData) => api.post('/pusher/auth', authData),
 };
 
 export default api; 

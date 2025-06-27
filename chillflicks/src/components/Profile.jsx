@@ -4,6 +4,7 @@ import { profileAPI } from '../api.js';
 
 const Profile = () => {
   const [user, setUser] = useState({});
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,17 +16,35 @@ const Profile = () => {
 
     const fetchUserData = async () => {
       try {
+        setLoading(true);
         const res = await profileAPI.get();
-        if (res.status !== 200) throw new Error('Failed to fetch user');
-        const data = res.data;
-        setUser(data);
+        if (res.status === 200) {
+          setUser(res.data.user || res.data);
+        } else {
+          throw new Error('Failed to fetch user');
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching profile:', err);
+        // If unauthorized, redirect to login
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        }
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchUserData();
   }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="text-black bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-auto">
+        <div className="text-center">Loading profile...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-black bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-auto">
@@ -43,8 +62,7 @@ const Profile = () => {
           />
         </div>
         <div className="text-center space-y-1">
-          <p className="text-lg"><strong>Full Name:</strong> {user.fullName}</p>
-          <p className="text-md"><strong>Username:</strong> {user.username}</p>
+          <p className="text-lg"><strong>Username:</strong> {user.username}</p>
           <p className="text-md"><strong>Email:</strong> {user.email}</p>
         </div>
       </div>
