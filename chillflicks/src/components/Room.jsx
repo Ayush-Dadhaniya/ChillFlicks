@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { roomsAPI } from "../api.js";
 
 const Room = () => {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ const Room = () => {
   const [showCode, setShowCode] = useState(false);
   const [buttonText, setButtonText] = useState("Generate Room Code");
   const [copyText, setCopyText] = useState("Click to copy room code");
+  const [loading, setLoading] = useState(false);
+
   const convertToEmbedUrl = (url) => {
     try {
       const urlObj = new URL(url);
@@ -33,24 +36,6 @@ const Room = () => {
       return url;
     }
   };
-  
-  const getHostFromToken = () => {
-  const token = localStorage.getItem("token");  // Corrected to 'token' based on your localStorage key
-  if (token) {
-    const base64Url = token.split('.')[1]; // Extract the payload part of the JWT token
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/'); // Correct Base64 URL encoding
-    try {
-      const decodedPayload = JSON.parse(atob(base64)); // Decode the base64 URL and parse it as JSON
-      console.log("Decoded Payload: ", decodedPayload);  // Log the decoded payload for inspection
-      return decodedPayload.id; // Assuming 'id' is the key for the host in the decoded token
-    } catch (error) {
-      console.error("Error decoding token:", error);
-      return null;
-    }
-  }
-  return null;
-};
-
 
   const generateRoomCode = async () => {
     if (!videoUrl.trim()) {
@@ -58,26 +43,23 @@ const Room = () => {
       return;
     }
 
-    const host = getHostFromToken(); // Get host from JWT token
-    if (!host) {
-      alert("No user found. Please log in again.");
-      return;
-    }
+    setLoading(true);
+    try {
+      const response = await roomsAPI.create({ 
+        videoUrl: convertToEmbedUrl(videoUrl) 
+      });
 
-    const response = await fetch('https://chillflicks.up.railway.app/rooms/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, videoUrl: convertToEmbedUrl(videoUrl) }),
-    });
-
-    const data = await response.json();
-    if (response.ok) {
-      setRoomCode(data.roomCode);
-      setShowCode(true);
-      setButtonText("Generate New Code");
-      navigate(`/rooms/${data.roomCode}`);
-    } else {
-      alert(data.message);
+      if (response.data) {
+        setRoomCode(response.data.room.roomCode);
+        setShowCode(true);
+        setButtonText("Generate New Code");
+        navigate(`/rooms/${response.data.room.roomCode}`);
+      }
+    } catch (error) {
+      console.error("Error creating room:", error);
+      alert(error.response?.data?.message || "Error creating room");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,9 +106,10 @@ const Room = () => {
 
             <button
               onClick={generateRoomCode}
-              className="bg-[#4CC9F0] text-black font-bold px-6 py-3 rounded-lg hover:-translate-y-1 transition-transform duration-200"
+              disabled={loading}
+              className="bg-[#4CC9F0] text-black font-bold px-6 py-3 rounded-lg hover:-translate-y-1 transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {buttonText}
+              {loading ? "Creating..." : buttonText}
             </button>
 
             {showCode && (

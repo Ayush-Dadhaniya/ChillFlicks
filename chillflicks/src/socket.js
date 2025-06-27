@@ -1,6 +1,9 @@
-import { io } from "socket.io-client";
+import Pusher from 'pusher-js';
 
-// Connect to the backend Socket.IO server (replace with your backend URL)
-const socket = io("https://chillflicks.up.railway.app/");
+// Initialize Pusher
+const pusher = new Pusher(process.env.VITE_PUSHER_KEY || 'your-pusher-key', {
+  cluster: process.env.VITE_PUSHER_CLUSTER || 'us2',
+  forceTLS: true
+});
 
-export default socket;
+export default pusher;

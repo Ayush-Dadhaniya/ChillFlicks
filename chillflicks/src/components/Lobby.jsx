@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
-import io from "socket.io-client";
+import pusher from "../socket.js";
+import { roomsAPI, messagesAPI } from "../api.js";
 
-const API_URL = "https://chillflicks.up.railway.app";
-const socket = io(API_URL);
 const emojis = ["😀", "😂", "😍", "😎", "😢", "👍", "🎉", "❤️", "🔥", "🙌", "👏", "😮", "🤔", "😭", "🥰"];
 
 const Lobby = () => {
@@ -28,7 +26,9 @@ const Lobby = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(false);
+  const [loading, setLoading] = useState(true);
   const emojiPickerRef = useRef(null);
+  const channelRef = useRef(null);
 
   const extractYouTubeId = (url) => {
     const regExp =
@@ -61,89 +61,92 @@ const Lobby = () => {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    const initializeRoom = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("No token found");
+          return;
+        }
 
-    try {
-      const decoded = JSON.parse(atob(token.split(".")[1]));
-      const name = decoded.username || decoded.name || "Guest";
-      setUserName(name);
+        // Get user info from token
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        const name = decoded.username || decoded.name || "Guest";
+        setUserName(name);
 
-      axios
-        .get(`${API_URL}/rooms/${roomCode}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => {
-          setVideoUrl(res.data.videoUrl);
-          setIsPlaying(res.data.isPlaying);
-          setParticipants(res.data.participants || []);
+        // Join room
+        const joinResponse = await roomsAPI.join(roomCode);
+        if (joinResponse.data) {
+          const roomData = joinResponse.data.room;
+          setVideoUrl(roomData.videoUrl);
+          setIsPlaying(roomData.isPlaying);
+          setCurrentTime(roomData.currentPlaybackTime);
+          setParticipants(roomData.participants || []);
+        }
+
+        // Get message history
+        const messagesResponse = await messagesAPI.get(roomCode);
+        if (messagesResponse.data) {
+          setMessages(messagesResponse.data.messages || []);
+        }
+
+        // Subscribe to Pusher channel
+        const channel = pusher.subscribe(`room-${roomCode}`);
+        channelRef.current = channel;
+
+        channel.bind('newMessage', (message) => {
+          setMessages((prev) => [...prev, message]);
+          setTimeout(() => {
+            if (chatMessagesRef.current) {
+              chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+            }
+          }, 100);
         });
-    } catch (err) {
-      console.error("Invalid token:", err);
-    }
+
+        channel.bind('participantJoined', (updatedParticipants) => {
+          setParticipants(updatedParticipants);
+        });
+
+        channel.bind('videoStateChanged', ({ isPlaying, currentTime }) => {
+          setIsPlaying(isPlaying);
+          setCurrentTime(currentTime);
+
+          const trySyncPlayback = () => {
+            if (playerRef.current && playerReady) {
+              const state = playerRef.current.getPlayerState();
+              const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
+
+              if (diff > 1) playerRef.current.seekTo(currentTime, true);
+              if (isPlaying && state !== 1) playerRef.current.playVideo();
+              if (!isPlaying && state === 1) playerRef.current.pauseVideo();
+            } else {
+              setTimeout(trySyncPlayback, 500);
+            }
+          };
+
+          trySyncPlayback();
+        });
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error initializing room:", error);
+        setLoading(false);
+      }
+    };
+
+    initializeRoom();
+
+    return () => {
+      if (channelRef.current) {
+        pusher.unsubscribe(`room-${roomCode}`);
+      }
+    };
   }, [roomCode]);
 
   const addEmoji = (emoji) => {
     setNewMessage((msg) => msg + emoji);
     setShowEmojiPicker(false);
   };
-
-  useEffect(() => {
-    if (!userName) return;
-
-    socket.emit("joinRoom", { roomId: roomCode, user: userName });
-
-    socket.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);
-      // Auto-scroll to the bottom when new messages arrive
-      setTimeout(() => {
-        if (chatMessagesRef.current) {
-          chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-        }
-      }, 100);
-    });
-
-    socket.on("messageHistory", (history) => {
-      setMessages(history);
-      // Auto-scroll to the bottom when message history loads
-      setTimeout(() => {
-        if (chatMessagesRef.current) {
-          chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-        }
-      }, 100);
-    });
-
-    socket.on("participantJoined", (updatedParticipants) => {
-      setParticipants(updatedParticipants);
-    });
-
-    socket.on("videoStateChanged", ({ isPlaying, currentTime }) => {
-      setIsPlaying(isPlaying);
-      setCurrentTime(currentTime);
-
-      const trySyncPlayback = () => {
-        if (playerRef.current && playerReady) {
-          const state = playerRef.current.getPlayerState();
-          const diff = Math.abs(playerRef.current.getCurrentTime() - currentTime);
-
-          if (diff > 1) playerRef.current.seekTo(currentTime, true);
-          if (isPlaying && state !== 1) playerRef.current.playVideo();
-          if (!isPlaying && state === 1) playerRef.current.pauseVideo();
-        } else {
-          setTimeout(trySyncPlayback, 500);
-        }
-      };
-
-      trySyncPlayback();
-    });
-
-    return () => {
-      socket.off("newMessage");
-      socket.off("messageHistory");
-      socket.off("participantJoined");
-      socket.off("videoStateChanged");
-    };
-  }, [userName, roomCode, playerReady]);
 
   // Update current time display
   useEffect(() => {
@@ -167,47 +170,61 @@ const Lobby = () => {
     };
   }, [playerReady, isPlaying, duration]);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e?.preventDefault();
 
     if (newMessage.trim()) {
-      const msg = {
-        user: userName,
-        text: newMessage,
-        time: new Date().toLocaleTimeString(),
-      };
-      socket.emit("sendMessage", { roomId: roomCode, message: msg });
-      setNewMessage("");
+      try {
+        const response = await messagesAPI.send({
+          roomId: roomCode,
+          content: newMessage,
+        });
+
+        if (response.data) {
+          setNewMessage("");
+        }
+      } catch (error) {
+        console.error("Error sending message:", error);
+      }
     }
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     if (!playerReady || !playerRef.current) return;
 
     const newPlayState = !isPlaying;
     const currentTime = playerRef.current.getCurrentTime();
 
     setIsPlaying(newPlayState);
-    socket.emit("updateVideoState", {
-      roomId: roomCode,
-      isPlaying: newPlayState,
-      currentTime,
-    });
+    
+    try {
+      await roomsAPI.update({
+        roomCode,
+        isPlaying: newPlayState,
+        currentPlaybackTime: currentTime,
+      });
+    } catch (error) {
+      console.error("Error updating video state:", error);
+    }
   };
 
   // Handle seeking
-  const handleSeek = (e) => {
+  const handleSeek = async (e) => {
     if (!playerReady || !playerRef.current) return;
 
     const seekTime = (e.target.value / 100) * duration;
     playerRef.current.seekTo(seekTime, true);
     setCurrentTime(seekTime);
 
-    socket.emit("updateVideoState", {
-      roomId: roomCode,
-      isPlaying,
-      currentTime: seekTime,
-    });
+    try {
+      await roomsAPI.update({
+        roomCode,
+        isPlaying,
+        currentPlaybackTime: seekTime,
+      });
+    } catch (error) {
+      console.error("Error seeking video:", error);
+    }
   };
 
   // Handle Full Screen
