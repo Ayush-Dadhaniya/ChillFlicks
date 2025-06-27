@@ -81,6 +81,7 @@ const Lobby = () => {
           setVideoUrl(roomData.videoUrl);
           setIsPlaying(roomData.isPlaying);
           setCurrentTime(roomData.currentPlaybackTime);
+          console.log("Participants data:", roomData.participants); // Debug log
           setParticipants(roomData.participants || []);
         }
 
@@ -467,7 +468,7 @@ const Lobby = () => {
                     </svg>
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0                       0 0 0 2 2v3M3 16v3a2 2 0 0 0 2 2h3" />
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
                     </svg>
                   )}
                 </button>
@@ -596,10 +597,21 @@ const Lobby = () => {
                   {participants && participants.length > 0 ? (
                     <div>
                       {participants.map((p, i) => {
-                        // Handle different participant data structures
-                        const username = p.username || p.user?.username || 'Unknown User';
-                        const avatar = p.avatar || p.user?.avatar || '/default_avatar.png';
-                        const isHost = p.status === "host" || p.isHost;
+                        // Handle different participant data structures with better error handling
+                        let username = 'Unknown User';
+                        let avatar = '/default_avatar.png';
+                        let isHost = false;
+                        
+                        try {
+                          if (p && typeof p === 'object') {
+                            username = p.username || p.user?.username || 'Unknown User';
+                            avatar = p.avatar || p.user?.avatar || '/default_avatar.png';
+                            isHost = p.status === "host" || p.isHost || false;
+                          }
+                        } catch (error) {
+                          console.error('Error processing participant data:', error, p);
+                        }
+                        
                         const isCurrentUser = username === userName;
                         
                         return (
