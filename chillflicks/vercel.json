@@ -12,9 +12,6 @@
     "api/profile.js": {
       "maxDuration": 30
     },
-    "api/profile/update-avatar.js": {
-      "maxDuration": 30
-    },
     "api/pusher/[...route].js": {
       "maxDuration": 30
     }
