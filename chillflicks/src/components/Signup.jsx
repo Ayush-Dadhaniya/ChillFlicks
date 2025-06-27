@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../api.js';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -8,26 +9,22 @@ const Signup = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try{
-      const res = await fetch('https://chillflicks.up.railway.app/auth/signup',{
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ fullName, username, email, password })
-      })
-      const data = await res.json();
-      if(res.ok){
+    try {
+      const res = await authAPI.signup({ fullName, username, email, password });
+      const data = res.data;
+      if (res.status === 201) {
         localStorage.setItem('token', data.token);
         window.dispatchEvent(new Event('authChanged'));
         navigate('/');
-      }else {
-        alert(data.message || 'Registration failed');
+      } else {
+        setErrorMessage(data.message || 'Registration failed');
       }
-    }catch(err){
-      console.log(err);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Something went wrong. Please try again later.');
     }
   };
 
@@ -35,6 +32,9 @@ const Signup = () => {
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-gray-900 p-8 rounded-2xl shadow-lg">
         <h2 className="text-2xl font-bold mb-6 text-center">Create a New Account</h2>
+        {errorMessage && (
+          <div className="text-red-500 text-sm mb-4">{errorMessage}</div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block mb-1">Full Name</label>

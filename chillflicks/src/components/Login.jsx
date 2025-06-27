@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../api.js';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,17 +18,9 @@ const Login = () => {
     }
 
     try {
-      const res = await fetch('https://chillflicks.up.railway.app/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
+      const res = await authAPI.login({ username, password });
+      const data = res.data;
+      if (res.status === 200) {
         localStorage.setItem('token', data.token);
         window.dispatchEvent(new Event('authChanged'));
         navigate('/');
@@ -35,8 +28,7 @@ const Login = () => {
         setErrorMessage(data.message || 'Login failed');
       }
     } catch (err) {
-      console.log(err);
-      setErrorMessage('Something went wrong. Please try again later.');
+      setErrorMessage(err.response?.data?.message || 'Something went wrong. Please try again later.');
     }
   };
 
@@ -52,7 +44,7 @@ const Login = () => {
             <label className="block mb-1">Username</label>
             <input
               type="text"
-              value={username} // Bind input value to state
+              value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Enter username"
@@ -62,7 +54,7 @@ const Login = () => {
             <label className="block mb-1">Password</label>
             <input
               type="password"
-              value={password} // Bind input value to state
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Enter password"
