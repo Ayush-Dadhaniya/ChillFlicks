@@ -6,22 +6,10 @@
     "api/auth/signup.js": {
       "maxDuration": 30
     },
-    "api/rooms/create.js": {
+    "api/rooms.js": {
       "maxDuration": 30
     },
-    "api/rooms/join.js": {
-      "maxDuration": 30
-    },
-    "api/rooms/get.js": {
-      "maxDuration": 30
-    },
-    "api/rooms/update.js": {
-      "maxDuration": 30
-    },
-    "api/messages/send.js": {
-      "maxDuration": 30
-    },
-    "api/messages/get.js": {
+    "api/messages.js": {
       "maxDuration": 30
     },
     "api/pusher/auth.js": {
