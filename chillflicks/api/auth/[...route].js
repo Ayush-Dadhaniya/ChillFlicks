@@ -19,6 +19,9 @@ export default async function handler(req, res) {
   const { route } = req.query;
   const [action] = route || [];
 
+  // Debug log
+  console.log('AUTH API:', { route, method: req.method, body: req.body });
+
   try {
     switch (action) {
       case 'signup':
@@ -85,14 +88,17 @@ async function handleSignup(req, res) {
 }
 
 async function handleLogin(req, res) {
-  const { email, password } = req.body;
+  const { username, email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
+  if ((!username && !email) || !password) {
+    return res.status(400).json({ message: 'Username/email and password are required' });
   }
 
   try {
-    const user = await User.findOne({ email });
+    // Allow login with either username or email
+    const user = await User.findOne(
+      username ? { username } : { email }
+    );
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
