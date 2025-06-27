@@ -17,7 +17,8 @@ export default async function handler(req, res) {
   await connectDB();
 
   const { route } = req.query;
-  const [action] = route || [];
+  const routeArr = Array.isArray(route) ? route : [route];
+  const [action] = routeArr;
 
   // Debug log
   console.log('AUTH API:', { route, method: req.method, body: req.body });
