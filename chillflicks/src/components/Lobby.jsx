@@ -593,41 +593,49 @@ const Lobby = () => {
             {showParticipants && (
               <div className="flex flex-col h-[500px]">
                 <div className="p-4 flex-grow overflow-y-auto custom-scrollbar">
-                  {participants.length > 0 ? (
+                  {participants && participants.length > 0 ? (
                     <div>
-                      {participants.map((p, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-gray-700/30 transition-colors rounded-lg mb-1"
-                        >
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-blue-500 flex items-center justify-center text-lg font-bold">
-                              {p.user.username ? p.user.username.charAt(0).toUpperCase() : '?'}
+                      {participants.map((p, i) => {
+                        // Handle different participant data structures
+                        const username = p.username || p.user?.username || 'Unknown User';
+                        const avatar = p.avatar || p.user?.avatar || '/default_avatar.png';
+                        const isHost = p.status === "host" || p.isHost;
+                        const isCurrentUser = username === userName;
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-gray-700/30 transition-colors rounded-lg mb-1"
+                          >
+                            <div className="relative">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-blue-500 flex items-center justify-center text-lg font-bold">
+                                {username.charAt(0).toUpperCase()}
+                              </div>
+                              <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${isHost ? "bg-yellow-400" : "bg-green-400"} border border-gray-900`}></span>
                             </div>
-                            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${p.status === "host" ? "bg-yellow-400" : "bg-green-400"} border border-gray-900`}></span>
-                          </div>
 
-                          <div className="flex-grow">
-                            <div className="font-bold text-white flex items-center">
-                              {p.user.username}
-                              {p.user.username === userName && (
-                                <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">You</span>
-                              )}
+                            <div className="flex-grow">
+                              <div className="font-bold text-white flex items-center">
+                                {username}
+                                {isCurrentUser && (
+                                  <span className="ml-2 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">You</span>
+                                )}
+                              </div>
+                              <div className={`text-xs ${isHost ? "text-yellow-400" : "text-blue-400"}`}>
+                                {isHost ? "Room Host" : "Viewer"}
+                              </div>
                             </div>
-                            <div className={`text-xs ${p.status === "host" ? "text-yellow-400" : "text-blue-400"}`}>
-                              {p.status === "host" ? "Room Host" : "Viewer"}
-                            </div>
-                          </div>
 
-                          {p.user.username !== userName && (
-                            <button className="text-gray-400 hover:text-white">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                            {!isCurrentUser && (
+                              <button className="text-gray-400 hover:text-white">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center text-gray-400 py-12 flex-grow flex items-center justify-center">
