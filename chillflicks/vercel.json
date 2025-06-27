@@ -1,15 +1,36 @@
 {
   "functions": {
-    "api/rooms/[...route].js": {
+    "api/auth/login.js": {
       "maxDuration": 30
     },
-    "api/messages/[...route].js": {
+    "api/auth/signup.js": {
       "maxDuration": 30
     },
-    "api/profile.js": {
+    "api/rooms/create.js": {
       "maxDuration": 30
     },
-    "api/pusher/[...route].js": {
+    "api/rooms/join.js": {
+      "maxDuration": 30
+    },
+    "api/rooms/get.js": {
+      "maxDuration": 30
+    },
+    "api/rooms/update.js": {
+      "maxDuration": 30
+    },
+    "api/messages/send.js": {
+      "maxDuration": 30
+    },
+    "api/messages/get.js": {
+      "maxDuration": 30
+    },
+    "api/pusher/auth.js": {
+      "maxDuration": 30
+    },
+    "api/profile/get.js": {
+      "maxDuration": 30
+    },
+    "api/profile/update.js": {
       "maxDuration": 30
     }
   }
