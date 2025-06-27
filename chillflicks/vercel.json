@@ -27,10 +27,7 @@
     "api/pusher/auth.js": {
       "maxDuration": 30
     },
-    "api/profile/get.js": {
-      "maxDuration": 30
-    },
-    "api/profile/update.js": {
+    "api/profile.js": {
       "maxDuration": 30
     }
   }
